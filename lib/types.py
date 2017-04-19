@@ -69,6 +69,7 @@ class ExtHopByHopType(TypeBase):
     SIBRA = 1
     SCMP = 2
     ONE_HOP_PATH = 3
+    SEQ_NUM = 4
 
 
 class ExtEndToEndType(TypeBase):

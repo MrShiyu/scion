@@ -28,8 +28,10 @@ var (
 	ExtnSIBRAType      = ExtnType{HopByHopClass, 1}
 	ExtnSCMPType       = ExtnType{HopByHopClass, 2}
 	ExtnOneHopPathType = ExtnType{HopByHopClass, 3}
+	ExtnSeqNumType 	   = ExtnType{HopByHopClass, 4}
 	ExtnPathTransType  = ExtnType{End2EndClass, 0}
 	ExtnPathProbeType  = ExtnType{End2EndClass, 1}
+
 )
 
 func (e ExtnType) String() string {
@@ -46,6 +48,9 @@ func (e ExtnType) String() string {
 		return "PathTrans"
 	case ExtnPathProbeType:
 		return "PathProbe"
+	case ExtnSeqNumType:
+		return "SequenceNumber"
+
 	}
 	return fmt.Sprintf("UNKNOWN (%d)", e)
 }
