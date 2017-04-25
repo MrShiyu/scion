@@ -70,6 +70,7 @@ func (r *Router) Run() *common.Error {
 	}
 	go r.SyncInterface()
 	go SeqNumInc()
+	go BfRotate()
 	go r.IFStateUpdate()
 	go r.RevInfoFwd()
 	var wg sync.WaitGroup

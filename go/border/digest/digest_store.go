@@ -29,6 +29,7 @@ type DigestStore struct {
 	Seq_num_window uint32               //FIXME: need to reconcile with the BF coverage period
 	Seq_info       map[string]*Curr_seq //map from the name of the border router to its current sequence number
 	filter         []BlockedFilter
+	length		int
 }
 
 //information needed for sequence number update
@@ -46,6 +47,7 @@ func Load(capacity, size, number int) {
 	digest := &DigestStore{}
 	digest.Curr_seq_num = 0
 	filter := make([]BlockedFilter, number)
+	digest.length = number
 	for i := 0; i < number; i++ {
 		filter[i] = NewBlockedBloomFilter(capacity, size)
 	}
@@ -69,14 +71,31 @@ func Load(capacity, size, number int) {
 
 
 func Add(byte_str []byte){
-	D.filter[0].BlockAdd(byte_str) //FIXME: change index to rotate filter afterwards
+	D.filter[Writeable].BlockAdd(byte_str)
+	s := fmt.Sprintf("digest successfully added to filter %d", Writeable)
+	log.Debug(s)
 }
 
 //Check if data is in the whole block filter
 func Check(byte_str []byte) bool{
-	return D.filter[0].BlockCheck(byte_str) //FIXME: change index to rotate filter afterwards
+	for i:=0; i<D.length; i++{
+		if D.filter[i].BlockCheck(byte_str){
+			return true
+		}
+	}
+	return false
 }
 
 
+var Writeable = 0
 
-//TODO: func rotate.
+func Rotate() {
+	if Writeable < D.length - 1 {
+		Writeable++
+	}else{
+		Writeable = 0
+	}
+	D.filter[Writeable].Reset()
+	s := fmt.Sprintf("%dth filter is now writeable and reset to 0", Writeable)
+	log.Debug(s)
+}

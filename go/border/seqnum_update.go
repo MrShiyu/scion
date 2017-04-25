@@ -15,7 +15,7 @@ const seqIncFreq = 10 * time.Millisecond
 
 func SeqNumInc() {
 	defer liblog.PanicLog()
-	for range time.Tick(ifIDFreq) {
+	for range time.Tick(seqIncFreq) {
 		if digest.D.Curr_seq_num< 20 {
 			//FIXME: now set the range of seqnum to 0-20(to show that it gets reset to 0.) Can be changed
 			digest.D.Curr_seq_num++
@@ -28,5 +28,11 @@ func SeqNumInc() {
 	}
 }
 
+const rotateFreq = 100 *time.Millisecond
 
-
+func BfRotate(){
+	defer liblog.PanicLog()
+	for range time.Tick(rotateFreq){
+		digest.Rotate()
+	}
+}
