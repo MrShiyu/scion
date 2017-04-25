@@ -26,7 +26,6 @@ import (
 
 	"github.com/netsec-ethz/scion/go/border/digest"
 	"github.com/netsec-ethz/scion/go/border/conf"
-	//"github.com/netsec-ethz/scion/go/lib/addr"
 	"github.com/netsec-ethz/scion/go/lib/common"
 	"github.com/netsec-ethz/scion/go/lib/spkt"
 )
@@ -67,7 +66,7 @@ func (t *rSeqNum) Process() (HookResult, *common.Error) {
 	s := fmt.Sprintf("the sequence number of this string is %d", t.Num)
 	t.Logger.Debug(s)
 	if strings.Compare(conf.C.IA.String(), t.rp.srcIA.String()) == 0{
-		seq := uint32(22) //FIXME: now just give a number. need to be changed to update
+		seq := digest.D.Curr_seq_num//FIXME: now just give a number. need to be changed to update
 		common.Order.PutUint32(t.raw[0:4], seq)
 		t.Num = seq
 		s := fmt.Sprintf("the seq number changed to %d ", seq)

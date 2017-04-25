@@ -25,6 +25,7 @@ import ("fmt"
 
 // Conf is the main digest structure. FIXME: need to be modified to rotate filter
 type DigestStore struct {
+	Curr_seq_num	uint32	//the current seq num for this AS
 	Seq_num_window uint32               //FIXME: need to reconcile with the BF coverage period
 	Seq_info       map[string]*Curr_seq //map from the name of the border router to its current sequence number
 	filter         []BlockedFilter
@@ -43,6 +44,7 @@ var D *DigestStore
 func Load(capacity, size, number int) {
 	// Declare a new Conf instance, and load the topology config.
 	digest := &DigestStore{}
+	digest.Curr_seq_num = 0
 	filter := make([]BlockedFilter, number)
 	for i := 0; i < number; i++ {
 		filter[i] = NewBlockedBloomFilter(capacity, size)
@@ -50,7 +52,6 @@ func Load(capacity, size, number int) {
 	digest.filter = filter
 	digest.Seq_num_window = 10 //FIXME: number needs discussing
 	info := make(map[string]*Curr_seq)
-	//FIXME: haven't consider removing this router itself from the map
 	for _, ifs := range conf.C.TopoMeta.IFMap{
 		v:= ifs.IF.IA.String()
 		curr := Curr_seq{Seq_num: 15,

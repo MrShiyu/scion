@@ -69,6 +69,7 @@ func (r *Router) Run() *common.Error {
 		return err
 	}
 	go r.SyncInterface()
+	go SeqNumInc()
 	go r.IFStateUpdate()
 	go r.RevInfoFwd()
 	var wg sync.WaitGroup
