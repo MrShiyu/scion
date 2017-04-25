@@ -28,6 +28,7 @@ import (
 	"github.com/syndtr/gocapability/capability"
 
 	"github.com/netsec-ethz/scion/go/border/conf"
+	"github.com/netsec-ethz/scion/go/border/digest"
 	"github.com/netsec-ethz/scion/go/border/metrics"
 	"github.com/netsec-ethz/scion/go/border/netconf"
 	"github.com/netsec-ethz/scion/go/border/rpkt"
@@ -61,6 +62,7 @@ func (r *Router) setup(confDir string) *common.Error {
 	if err := conf.Load(r.Id, confDir); err != nil {
 		return err
 	}
+	digest.Load(1000,1,2)
 	log.Debug("Topology loaded", "topo", conf.C.BR)
 	log.Debug("AS Conf loaded", "conf", conf.C.ASConf)
 

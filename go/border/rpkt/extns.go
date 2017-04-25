@@ -22,6 +22,7 @@ import (
 
 	"github.com/netsec-ethz/scion/go/lib/common"
 	"github.com/netsec-ethz/scion/go/lib/scmp"
+	"fmt"
 )
 
 // rExtension extends common.ExtnBase, adding a method to retrieve the
@@ -44,11 +45,24 @@ func (rp *RtrPkt) extnParseHBH(extType common.ExtnType,
 	start, end, pos int) (rExtension, *common.Error) {
 	switch {
 	case extType == common.ExtnTracerouteType:
-		return rTracerouteFromRaw(rp, start, end)
+		{
+			return rTracerouteFromRaw(rp, start, end)
+		}
+
 	case extType == common.ExtnOneHopPathType:
-		return rOneHopPathFromRaw(rp)
+		{
+			return rOneHopPathFromRaw(rp)
+		}
 	case extType == common.ExtnSCMPType:
-		return rSCMPExtFromRaw(rp, start, end)
+		{
+			return rSCMPExtFromRaw(rp, start, end)
+		}
+	case extType == common.ExtnSeqNumType:
+		{
+			fmt.Println("gets sequence number extension")
+			return rSeqNumFromRaw(rp, start, end)
+		}
+
 	default:
 		// HBH not supported, so send an SCMP error in response.
 		sdata := scmp.NewErrData(scmp.C_Ext, scmp.T_E_BadHopByHop,

@@ -22,6 +22,7 @@ import logging
 # SCION
 from lib.main import main_wrapper
 from lib.packet.ext.traceroute import TracerouteExt
+from lib.packet.ext.seq_num import SeqNumExt
 from lib.packet.ext.path_transport import (
     PathTransportExt,
     PathTransOFPath,
@@ -52,11 +53,14 @@ class ExtClient(TestClientBase):
         exts = []
         # Create empty Traceroute extensions with allocated space
         exts.append(TracerouteExt.from_values(routers_no))
+        #create SeqnumExtension
+        exts.append(SeqNumExt.from_values(12)) # the argument is the sequence number
         # Create PathTransportExtension
         # One with data-plane path.
         of_path = PathTransOFPath.from_values(self.addr, self.dst, fwd_path)
         exts.append(PathTransportExt.from_values(
             PathTransType.OF_PATH, of_path))
+
         return exts
 
     def _handle_response(self, spkt):

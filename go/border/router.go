@@ -29,6 +29,8 @@ import (
 	"github.com/netsec-ethz/scion/go/lib/common"
 	"github.com/netsec-ethz/scion/go/lib/log"
 	"github.com/netsec-ethz/scion/go/lib/spath"
+
+	//"fmt"
 )
 
 type Router struct {
@@ -103,6 +105,7 @@ func (r *Router) processPacket(rp *rpkt.RtrPkt) {
 	// Assign a pseudorandom ID to the packet, for correlating log entries.
 	rp.Id = logext.RandId(4)
 	rp.Logger = log.New("rpkt", rp.Id)
+	//log.Debug(rp.Raw.String())
 	if err := rp.Parse(); err != nil {
 		r.handlePktError(rp, err, "Error parsing packet")
 		return
