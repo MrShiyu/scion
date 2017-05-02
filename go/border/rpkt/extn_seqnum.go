@@ -19,7 +19,7 @@ package rpkt
 
 import (
 	"fmt"
-	"time"
+	//"time"
 	"strings"
 
 	log "github.com/inconshreveable/log15"
@@ -31,6 +31,7 @@ import (
 )
 
 var _ rExtension = (*rSeqNum)(nil)
+
 
 // rTraceroute is the router's representation of the Traceroute extension.
 type rSeqNum struct {
@@ -66,15 +67,21 @@ func (t *rSeqNum) Process() (HookResult, *common.Error) {
 	s := fmt.Sprintf("the sequence number of this string is %d", t.Num)
 	t.Logger.Debug(s)
 	if strings.Compare(conf.C.IA.String(), t.rp.srcIA.String()) == 0{
-		seq := digest.D.Curr_seq_num//FIXME: now just give a number. need to be changed to update
+		seq := digest.D.Curr_seq_num
 		common.Order.PutUint32(t.raw[0:4], seq)
 		t.Num = seq
 		s := fmt.Sprintf("the seq number changed to %d ", seq)
 		t.Logger.Debug(s)
 	}else {
 		if val, ok := digest.D.Seq_info[t.rp.srcIA.String()]; ok {
+			if !val.Valid {
+				val.Seq_num = t.Num
+				val.Valid = true
+				s := fmt.Sprintf("valid flag is set to %b, sequence number is %d", digest.D.Seq_info[t.rp.srcIA.String()].Valid, digest.D.Seq_info[t.rp.srcIA.String()].Seq_num)
+				t.Logger.Debug(s)
+			}
 			curr_seq := val.Seq_num
-			if (t.Num < curr_seq - digest.D.Seq_num_window){
+			if (!checkSeqWin(t.Num, digest.D.Seq_num_window, curr_seq)){
 				//seq num out of sliding window.
 				ss := fmt.Sprintf("packet num is %d, stored num is %d ", t.Num, curr_seq)
 				t.Logger.Debug(ss)
@@ -83,27 +90,42 @@ func (t *rSeqNum) Process() (HookResult, *common.Error) {
 			}else{
 				//check if need to update sequence number
 				if t.Num > curr_seq {
-					digest.D.Seq_info[t.rp.srcIA.String()].Seq_num = t.Num
+					aq := fmt.Sprintf("the stored seq num for %s is %d", t.rp.srcIA.String(), curr_seq)
+					t.Logger.Debug(aq)
+					val.Seq_num = t.Num
+					digest.TTLupdate(t.rp.srcIA.String(), 0)
 					a := fmt.Sprintf("the stored seq num for %s update to %d", t.rp.srcIA.String(), t.Num)
 					t.Logger.Debug(a)
 				}
 			}
-			if digest.Check([]byte(t.rp.Raw)) {
-				t.Logger.Debug("the digest is already in the digest store, should drop this packet")
-				return HookContinue, nil
-			}
 		}else{
 			new_seq := digest.Curr_seq{Seq_num: 15,
-				TTL: 500 * time.Millisecond}
+				TTL: digest.SeqIncplusDelta}
 			digest.D.Seq_info[t.rp.srcIA.String()] = &new_seq
 			t.Logger.Debug("create a new entry for ", t.rp.srcIA.String())
 		}
-		//Question: do I need to check this packet, if it's the first one received from one AS?
+		if digest.Check([]byte(t.rp.Raw)) {
+			t.Logger.Debug("the digest is already in the digest store, should drop this packet")
+			return HookContinue, nil
+		}
 		digest.Add([]byte(t.rp.Raw))
 		t.Logger.Debug("packet digest successfully added")
 	}
 
 	return HookContinue, nil
+}
+
+//check if the current num is within valid sequence number window
+func checkSeqWin(num, winsize, currseq uint32) bool{
+	if currseq <= winsize {
+		if num>=0 && num <= currseq {return true}
+		if num>currseq && (currseq+digest.Seq_num_range - num)<= winsize {return true}
+		//consider wrap around
+		return false
+	}else{
+		return num + winsize >= currseq
+	}
+
 }
 
 // GetExtn returns the spkt.SeqNum representation. The big difference

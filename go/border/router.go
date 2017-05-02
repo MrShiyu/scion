@@ -69,6 +69,7 @@ func (r *Router) Run() *common.Error {
 		return err
 	}
 	go r.SyncInterface()
+	go TTLcheck()
 	go SeqNumInc()
 	go BfRotate()
 	go r.IFStateUpdate()

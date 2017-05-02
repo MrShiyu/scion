@@ -23,19 +23,22 @@ import ("fmt"
 	log "github.com/inconshreveable/log15"
 )
 
-// Conf is the main digest structure. FIXME: need to be modified to rotate filter
+// Conf is the main digest structure.
 type DigestStore struct {
-	Curr_seq_num	uint32	//the current seq num for this AS
+	Curr_seq_num   uint32	//the current seq num for this AS
 	Seq_num_window uint32               //FIXME: need to reconcile with the BF coverage period
 	Seq_info       map[string]*Curr_seq //map from the name of the border router to its current sequence number
 	filter         []BlockedFilter
-	length		int
+	length         int
 }
+
+const Seq_num_range = 100
 
 //information needed for sequence number update
 type Curr_seq struct{
 	Seq_num uint32
 	TTL     time.Duration //NOTE: maybe change to pure number
+	Valid   bool          //flag, shows if the sequence number starts to be valid
 }
 
 // C is a pointer to the current configuration.
@@ -52,12 +55,13 @@ func Load(capacity, size, number int) {
 		filter[i] = NewBlockedBloomFilter(capacity, size)
 	}
 	digest.filter = filter
-	digest.Seq_num_window = 10 //FIXME: number needs discussing
+	digest.Seq_num_window = 20 //FIXME: number needs discussing
 	info := make(map[string]*Curr_seq)
 	for _, ifs := range conf.C.TopoMeta.IFMap{
 		v:= ifs.IF.IA.String()
-		curr := Curr_seq{Seq_num: 15,
-			TTL: 500 * time.Millisecond}
+		curr := Curr_seq{Seq_num: 0,
+			TTL: SeqIncplusDelta,
+			Valid: false}
 		//FIXME: the initial time can be changed according to need. Need to reconcile with the new entries added in extn_seqnum
 		info[v] = &curr
 		s := fmt.Sprintf("the As %s has sequence number %d initial TTL %d", v,curr.Seq_num, int64(curr.TTL))
@@ -96,6 +100,20 @@ func Rotate() {
 		Writeable = 0
 	}
 	D.filter[Writeable].Reset()
-	s := fmt.Sprintf("%dth filter is now writeable and reset to 0", Writeable)
-	log.Debug(s)
+	//s := fmt.Sprintf("%dth filter is now writeable and reset to 0", Writeable)
+	//log.Debug(s)
+}
+
+
+const SeqIncFreq = 10 * time.Millisecond
+
+const delta = time.Microsecond //account for clock askew
+
+const SeqIncplusDelta = SeqIncFreq + delta
+
+func TTLupdate(as string, augment time.Duration){
+	//augment is a negative TTL that remains from the last session
+	D.Seq_info[as].TTL = SeqIncplusDelta + augment
+	//s:=fmt.Sprintf("the TTL of the sequence number for %s is reinitialized to %d", as, D.Seq_info[as].TTL)
+	//log.Debug(s)
 }
