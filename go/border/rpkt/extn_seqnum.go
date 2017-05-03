@@ -84,12 +84,12 @@ func (t *rSeqNum) Process() (HookResult, *common.Error) {
 			if (!checkSeqWin(t.Num, digest.D.Seq_num_window, curr_seq)){
 				//seq num out of sliding window.
 				ss := fmt.Sprintf("packet num is %d, stored num is %d ", t.Num, curr_seq)
-				t.Logger.Debug(ss)
-				t.Logger.Debug("seq num out of sliding window. Should drop this packet")
-				return HookContinue, nil
+				//t.Logger.Debug(ss)
+				//t.Logger.Debug("seq num out of sliding window. Should drop this packet")
+				return HookContinue, common.NewError(ss, "seq num out of sliding window. Should drop this packet")
 			}else{
 				//check if need to update sequence number
-				if t.Num > curr_seq {
+				if checkSeqUpdate(t.Num, curr_seq) {
 					aq := fmt.Sprintf("the stored seq num for %s is %d", t.rp.srcIA.String(), curr_seq)
 					t.Logger.Debug(aq)
 					val.Seq_num = t.Num
@@ -105,8 +105,10 @@ func (t *rSeqNum) Process() (HookResult, *common.Error) {
 			t.Logger.Debug("create a new entry for ", t.rp.srcIA.String())
 		}
 		if digest.Check([]byte(t.rp.Raw)) {
-			t.Logger.Debug("the digest is already in the digest store, should drop this packet")
-			return HookContinue, nil
+			t.Logger.Error("the digest is already in the digest store, should drop this packet")
+			e := common.NewError("the digest is already in the digest store, should drop this packet")
+			fmt.Println("the digest is already in the digest store, should drop this packet")
+			return HookContinue, e
 		}
 		digest.Add([]byte(t.rp.Raw))
 		t.Logger.Debug("packet digest successfully added")
@@ -116,18 +118,26 @@ func (t *rSeqNum) Process() (HookResult, *common.Error) {
 }
 
 //check if the current num is within valid sequence number window
-func checkSeqWin(num, winsize, currseq uint32) bool{
-	if currseq <= winsize {
-		if num>=0 && num <= currseq {return true}
-		if num>currseq && (currseq+digest.Seq_num_range - num)<= winsize {return true}
+func checkSeqWin(num, winsize, storedseq uint32) bool{
+	if storedseq <= winsize {
+		if num>=0 && num <= storedseq {return true}
+		if num> storedseq && (storedseq +digest.Seq_num_range - num)<= winsize {return true}
 		//consider wrap around
 		return false
 	}else{
-		return num + winsize >= currseq
+		if num + digest.Seq_num_range - storedseq < winsize {return true}
+		//FIXME: at wrap around time, set a limit as winsize, so that we consider the wrap around packet seq num as bigger
+		//the limit can be discussed
+		return num + winsize >= storedseq
 	}
 
 }
 
+func checkSeqUpdate(packetSeq, storedSeq uint32) bool{
+	if packetSeq + digest.Seq_num_range - storedSeq <= digest.D.Seq_num_window { return true}
+	//FIXME: at wrap around time, set a limit as winsize, so that we consider the wrap around packet seq num as bigger
+	return packetSeq > storedSeq
+}
 // GetExtn returns the spkt.SeqNum representation. The big difference
 // between the two representations is that the latter doesn't have an
 // underlying buffer, so instead it has a slice of TracerouteEntry's.

@@ -22,7 +22,6 @@ import (
 
 	"github.com/netsec-ethz/scion/go/lib/common"
 	"github.com/netsec-ethz/scion/go/lib/scmp"
-	"fmt"
 )
 
 // rExtension extends common.ExtnBase, adding a method to retrieve the
@@ -59,7 +58,6 @@ func (rp *RtrPkt) extnParseHBH(extType common.ExtnType,
 		}
 	case extType == common.ExtnSeqNumType:
 		{
-			fmt.Println("gets sequence number extension")
 			return rSeqNumFromRaw(rp, start, end)
 		}
 
