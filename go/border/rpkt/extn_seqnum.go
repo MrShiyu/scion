@@ -50,7 +50,7 @@ func rSeqNumFromRaw(rp *RtrPkt, start, end int) (*rSeqNum, *common.Error) {
 	for i:=0; i<4; i++ {
 		seq[i] = byte(t.raw[i])
 	}
-	t.Num = common.Order.Uint32(seq) //FIXME: possible mistake at byte parsing
+	t.Num = common.Order.Uint32(seq)
 	t.Logger = rp.Logger.New("ext", "sequenceNumber")
 	return t, nil
 }
@@ -86,7 +86,7 @@ func (t *rSeqNum) Process() (HookResult, *common.Error) {
 				ss := fmt.Sprintf("packet num is %d, stored num is %d ", t.Num, curr_seq)
 				//t.Logger.Debug(ss)
 				//t.Logger.Debug("seq num out of sliding window. Should drop this packet")
-				return HookContinue, common.NewError(ss, "seq num out of sliding window. Should drop this packet")
+				return HookContinue, common.NewError(ss,"seq num out of sliding window. Should drop this packet")
 			}else{
 				//check if need to update sequence number
 				if checkSeqUpdate(t.Num, curr_seq) {
@@ -105,9 +105,9 @@ func (t *rSeqNum) Process() (HookResult, *common.Error) {
 			t.Logger.Debug("create a new entry for ", t.rp.srcIA.String())
 		}
 		if digest.Check([]byte(t.rp.Raw)) {
-			t.Logger.Error("the digest is already in the digest store, should drop this packet")
+			//t.Logger.Error("the digest is already in the digest store, should drop this packet")
 			e := common.NewError("the digest is already in the digest store, should drop this packet")
-			fmt.Println("the digest is already in the digest store, should drop this packet")
+			//fmt.Println("the digest is already in the digest store, should drop this packet")
 			return HookContinue, e
 		}
 		digest.Add([]byte(t.rp.Raw))

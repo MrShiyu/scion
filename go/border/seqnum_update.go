@@ -21,7 +21,7 @@ func SeqNumInc() {
 			log.Debug(s)
 		}else{
 			digest.D.Curr_seq_num = 0
-			//log.Debug("seq num reset to 0")
+			log.Debug("seq num reset to 0")
 		}
 	}
 }
