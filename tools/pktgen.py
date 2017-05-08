@@ -29,6 +29,7 @@ from lib.packet.packet_base import PayloadRaw
 from lib.packet.scion_addr import ISD_AS, SCIONAddr
 from lib.socket import UDPSocket
 from test.integration.base_cli_srv import TestClientBase
+from lib.sciond_api.path_meta import FwdPathMeta
 #added import for extn
 from lib.packet.ext.traceroute import TracerouteExt
 from lib.packet.ext.seq_num import SeqNumExt
@@ -86,16 +87,24 @@ class PktGen(TestClientBase):
     def _create_extensions(self):
         # Determine number of border routers on path in single direction
         fwd_path = self.path_meta.fwd_path()
+        isds = [str(ifs.isd_as()) for ifs in self.path_meta.iter_ifs()]
+        isds.pop(0)
+        #remove duplicate without losing order
+        isd_list = []
+        for i in isds:
+            if i not in isd_list:
+                isd_list.append(i)
         routers_no = (fwd_path.get_as_hops() - 1) * 2
         # Number of router for round-trip (return path is symmetric)
         routers_no *= 2
+        as_no = fwd_path.get_as_hops() - 1
 
         # Extensions
         exts = []
         # Create empty Traceroute extensions with allocated space
         #exts.append(TracerouteExt.from_values(routers_no))
         # create SeqnumExtension
-        exts.append(SeqNumExt.from_values(12))  # the argument is the sequence number
+        exts.append(SeqNumExt.from_values(13, as_no, isd_list))  # the argument is the sequence number
         # Create PathTransportExtension
         # One with data-plane path.
         #of_path = PathTransOFPath.from_values(self.addr, self.dst, fwd_path)
