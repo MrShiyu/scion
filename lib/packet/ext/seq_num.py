@@ -105,9 +105,6 @@ class SeqNumExt(HopByHopExtension):
         packed.append(struct.pack("!B", self.curr_hop))
         for mac in self.macs:
             packed.append(struct.pack("!16s", mac))
-        # Compute and set padding for the rest of the payload.
-        if self.total_hop%2 == 1:
-            packed.append(struct.pack("!16s", b" "))
         raw = b"".join(packed)
         self._check_len(raw)
         print("seq_num successfully packed, the sequence number is " + str(self.seq_num))
