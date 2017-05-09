@@ -28,19 +28,27 @@ import (
 	"github.com/netsec-ethz/scion/go/border/conf"
 	"github.com/netsec-ethz/scion/go/lib/common"
 	"github.com/netsec-ethz/scion/go/lib/spkt"
+	"crypto/hmac"
+	"crypto/md5"
+	//"github.com/netsec-ethz/scion/go/lib/assert"
 )
 
 var _ rExtension = (*rSeqNum)(nil)
 
+const MAC_LEN = 16
+
 
 // rTraceroute is the router's representation of the Traceroute extension.
 type rSeqNum struct {
-	rp        *RtrPkt
-	Num 	  uint32
-	raw 	  common.RawBytes
+	rp       *RtrPkt
+	Num      uint32
+	curr_hop uint8
+	total_hop uint8
+	raw      common.RawBytes
+	mac	[]byte //here use md5, has the output length of 16 bytes
 	log.Logger
 }
-
+var myKEY = []byte{0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}
 
 // rSeqNumFromRaw creates an rSeqNum instance from raw bytes, keeping a
 // reference to the location in the packet's buffer.
@@ -51,6 +59,12 @@ func rSeqNumFromRaw(rp *RtrPkt, start, end int) (*rSeqNum, *common.Error) {
 		seq[i] = byte(t.raw[i])
 	}
 	t.Num = common.Order.Uint32(seq)
+	t.curr_hop = t.raw[4]
+	t.total_hop = uint8(len(t.raw)-common.ExtnFirstLineLen)/(common.LineLen * 2)
+	offset := common.ExtnFirstLineLen + common.LineLen * 2 * int(t.curr_hop)
+	t.mac = make([]byte, MAC_LEN)
+	copy(t.mac, t.raw[offset:offset+16])
+	fmt.Println("the t raw is ", t.raw[offset:offset+16], "current hop is ", t.curr_hop, "the t.mac is ", t.mac)
 	t.Logger = rp.Logger.New("ext", "sequenceNumber")
 	return t, nil
 }
@@ -61,62 +75,105 @@ func (t *rSeqNum) RegisterHooks(h *hooks) *common.Error {
 	return nil
 }
 
-// FIXME: Now process only writes the number in the logger/print the number,
-// need to be modified to check sliding window afterwards
 func (t *rSeqNum) Process() (HookResult, *common.Error) {
 	s := fmt.Sprintf("the sequence number of this string is %d", t.Num)
 	t.Logger.Debug(s)
+	seg_for_mac := []byte(t.rp.Raw[8:50])//the common header changes on the way
+
+	//if packet goes out from an AS
 	if strings.Compare(conf.C.IA.String(), t.rp.srcIA.String()) == 0{
-		seq := digest.D.Curr_seq_num
-		common.Order.PutUint32(t.raw[0:4], seq)
-		t.Num = seq
-		s := fmt.Sprintf("the seq number changed to %d ", seq)
-		t.Logger.Debug(s)
-	}else {
-		if val, ok := digest.D.Seq_info[t.rp.srcIA.String()]; ok {
-			if !val.Valid {
-				val.Seq_num = t.Num
-				val.Valid = true
-				s := fmt.Sprintf("valid flag is set to %b, sequence number is %d", digest.D.Seq_info[t.rp.srcIA.String()].Valid, digest.D.Seq_info[t.rp.srcIA.String()].Seq_num)
-				t.Logger.Debug(s)
-			}
-			curr_seq := val.Seq_num
-			if (!checkSeqWin(t.Num, digest.D.Seq_num_window, curr_seq)){
-				//seq num out of sliding window.
-				ss := fmt.Sprintf("packet num is %d, stored num is %d ", t.Num, curr_seq)
-				//t.Logger.Debug(ss)
-				//t.Logger.Debug("seq num out of sliding window. Should drop this packet")
-				return HookContinue, common.NewError(ss,"seq num out of sliding window. Should drop this packet")
-			}else{
-				//check if need to update sequence number
-				if checkSeqUpdate(t.Num, curr_seq) {
-					aq := fmt.Sprintf("the stored seq num for %s is %d", t.rp.srcIA.String(), curr_seq)
-					t.Logger.Debug(aq)
-					val.Seq_num = t.Num
-					digest.TTLupdate(t.rp.srcIA.String(), 0)
-					a := fmt.Sprintf("the stored seq num for %s update to %d", t.rp.srcIA.String(), t.Num)
-					t.Logger.Debug(a)
-				}
-			}
-		}else{
-			new_seq := digest.Curr_seq{Seq_num: 15,
-				TTL: digest.SeqIncplusDelta}
-			digest.D.Seq_info[t.rp.srcIA.String()] = &new_seq
-			t.Logger.Debug("create a new entry for ", t.rp.srcIA.String())
+		t.Num = digest.D.Curr_seq_num
+		common.Order.PutUint32(t.raw[0:4], t.Num)
+		offset := common.ExtnFirstLineLen
+		for i:= 0; i < int(t.total_hop); i++ {
+			offset += common.LineLen*i*2
+			//TODO: parse the string to get the name of the As
+			mac_code := computeMac(seg_for_mac, myKEY)
+			copy(t.raw[offset:offset+16], mac_code)
 		}
+		s := fmt.Sprintf("the seq number changed to %d ", t.Num)
+		t.Logger.Debug(s)
+	}else{
+		//if packet goes through this router
+
+		//if it comes from border router in the same AS
+		if t.rp.DirFrom == DirLocal{
+			return HookContinue, nil
+		}
+
+		//add seq info entry if not existed
+		if _, ok := digest.D.Seq_info[t.rp.srcIA.String()]; !ok {
+			digest.D.AddAsEntry(t.rp.srcIA.String())
+		}
+		val := digest.D.Seq_info[t.rp.srcIA.String()]
+
+		//authentication
+		if !t.authenticate(seg_for_mac, val.MacKey)  {
+			t.Logger.Debug("authentication failed")
+			return HookContinue, nil//common.NewError("authentication failed")
+		}else{
+			t.Logger.Debug("authentication passed")
+		}
+
+		//seq_num check
+		if !val.Valid {
+			val.Seq_num = t.Num
+			val.Valid = true
+			s := fmt.Sprintf("valid flag is set to %b, sequence number is %d", digest.D.Seq_info[t.rp.srcIA.String()].Valid, digest.D.Seq_info[t.rp.srcIA.String()].Seq_num)
+			t.Logger.Debug(s)
+		}
+		curr_seq := val.Seq_num
+		if (!checkSeqWin(t.Num, digest.D.Seq_num_window, curr_seq)){
+			//seq num out of sliding window.
+			ss := fmt.Sprintf("packet num is %d, stored num is %d ", t.Num, curr_seq)
+			//t.Logger.Debug(ss)
+			//t.Logger.Debug("seq num out of sliding window. Should drop this packet")
+			return HookContinue, common.NewError(ss,"seq num out of sliding window. Should drop this packet")
+		}else{
+			//check if need to update sequence number
+			if checkSeqUpdate(t.Num, curr_seq) {
+				aq := fmt.Sprintf("the stored seq num for %s is %d", t.rp.srcIA.String(), curr_seq)
+				t.Logger.Debug(aq)
+				val.Seq_num = t.Num
+				digest.TTLupdate(t.rp.srcIA.String(), 0)
+				a := fmt.Sprintf("the stored seq num for %s update to %d", t.rp.srcIA.String(), t.Num)
+				t.Logger.Debug(a)
+			}
+		}
+
+		//digest check
 		if digest.Check([]byte(t.rp.Raw)) {
-			//t.Logger.Error("the digest is already in the digest store, should drop this packet")
-			e := common.NewError("the digest is already in the digest store, should drop this packet")
-			//fmt.Println("the digest is already in the digest store, should drop this packet")
-			return HookContinue, e
+			t.Logger.Error("the digest is already in the digest store, should drop this packet")
+			//e := common.NewError("the digest is already in the digest store, should drop this packet")
+			return HookContinue, nil
 		}
 		digest.Add([]byte(t.rp.Raw))
 		t.Logger.Debug("packet digest successfully added")
 	}
-
 	return HookContinue, nil
 }
 
+
+func computeMac(message, key []byte) []byte {
+	mac := hmac.New(md5.New, key)
+	mac.Write(message)
+	return mac.Sum(nil)
+}
+
+func (t *rSeqNum)authenticate(message, key []byte) bool {
+	expectedMAC := computeMac(message, key)
+	//fmt.Println("the t raw used for computing mac is ", message)
+	//fmt.Println("the mac code computed  is " , expectedMAC)
+	t.curr_hop += 1
+	t.raw[4] = t.curr_hop
+	return hmac.Equal(t.mac, expectedMAC)
+}
+
+//here we assume the length of the macEntry is the valid length of a mac entry
+func parseAs(macEntry []byte) string{
+	//TODO: parse the string
+	return ""
+}
 //check if the current num is within valid sequence number window
 func checkSeqWin(num, winsize, storedseq uint32) bool{
 	if storedseq <= winsize {
@@ -138,6 +195,7 @@ func checkSeqUpdate(packetSeq, storedSeq uint32) bool{
 	//FIXME: at wrap around time, set a limit as winsize, so that we consider the wrap around packet seq num as bigger
 	return packetSeq > storedSeq
 }
+
 // GetExtn returns the spkt.SeqNum representation. The big difference
 // between the two representations is that the latter doesn't have an
 // underlying buffer, so instead it has a slice of TracerouteEntry's.

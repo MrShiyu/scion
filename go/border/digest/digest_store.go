@@ -23,6 +23,8 @@ import ("fmt"
 	log "github.com/inconshreveable/log15"
 )
 
+var defaultKEY = []byte{0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}
+
 // Conf is the main digest structure.
 type DigestStore struct {
 	Curr_seq_num   uint32	//the current seq num for this AS
@@ -39,9 +41,10 @@ type Curr_seq struct{
 	Seq_num uint32
 	TTL     time.Duration //NOTE: maybe change to pure number
 	Valid   bool          //flag, shows if the sequence number starts to be valid
+	MacKey  []byte	      //shared key for mac computation
 }
 
-// C is a pointer to the current configuration.
+// D is a pointer to the current configuration.
 var D *DigestStore
 
 // Load sets up the configuration, loading it from the supplied config directory.
@@ -57,22 +60,25 @@ func Load(capacity, size, number int) {
 	digest.filter = filter
 	digest.Seq_num_window = 20 //FIXME: number needs discussing
 	info := make(map[string]*Curr_seq)
-	for _, ifs := range conf.C.TopoMeta.IFMap{
-		v:= ifs.IF.IA.String()
-		curr := Curr_seq{Seq_num: 0,
-			TTL: SeqIncplusDelta,
-			Valid: false}
-		//FIXME: the initial time can be changed according to need. Need to reconcile with the new entries added in extn_seqnum
-		info[v] = &curr
-		s := fmt.Sprintf("the As %s has sequence number %d initial TTL %d", v,curr.Seq_num, int64(curr.TTL))
-		log.Debug(s)
-	}
 	digest.Seq_info = info
 	// Save Digest
 	D = digest
-	fmt.Println("digest store successfully created")
+	for _, ifs := range conf.C.TopoMeta.IFMap{
+		v:= ifs.IF.IA.String()
+		D.AddAsEntry(v)
+	}
 }
 
+func (D *DigestStore)AddAsEntry(asname string){
+	new_seq := Curr_seq{Seq_num: 0,
+		TTL: SeqIncplusDelta,
+		Valid: false,
+		MacKey: defaultKEY}
+	D.Seq_info[asname] = &new_seq
+	log.Debug("create a new entry for " + asname)
+	ss := fmt.Sprintf("the As %s has sequence number %d initial TTL %d", asname,new_seq.Seq_num, int64(new_seq.TTL))
+	log.Debug(ss)
+}
 
 func Add(byte_str []byte){
 	D.filter[Writeable].BlockAdd(byte_str)

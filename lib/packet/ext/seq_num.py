@@ -63,16 +63,17 @@ class SeqNumExt(HopByHopExtension):
         """
         super()._parse(raw)
         self.curr_hop = raw[4]
-        data = Raw(raw, self.NAME, self.FIRST_LEN + (self.curr_hop * self.MAC_LEN))
+        data = Raw(raw, self.NAME, self.FIRST_LEN + (self.curr_hop * self.MAC_LEN * 2))
         self.seq_num = struct.unpack("!I", data.pop(4))[0] #because !I stands for unsigned integer! [0] gets four bytes!
         data.pop(1)
-        mac_list = struct.unpack("!16b", data.pop(self.MAC_LEN * self.curr_hop))
+        mac_list = list(struct.unpack("!16b", data.pop(self.MAC_LEN * self.curr_hop)))
         for mac in mac_list:
             self.macs.append(mac)
         #for a, b, c, d in zip(mac_list[0::4], mac_list[1::4], mac_list[2::4], mac_list[3::4]):
         #    isdas = a+b+c+d
         #    self.macs.append(isdas)
         print("seq_num successfully parsed, the sequence number is " + str(self.seq_num))
+        print("the mac list is " + str(mac_list))
 
 
 
@@ -116,7 +117,7 @@ class SeqNumExt(HopByHopExtension):
         """
         Return string representation
         """
-        return "%s(%sB): Sequence Number: %s" % (
-            self.NAME, len(self), self.seq_num)
+        return "%s(%sB): Sequence Number: %s, current hop for mac: %d" % (
+            self.NAME, len(self), self.seq_num, self.curr_hop)
 
 
