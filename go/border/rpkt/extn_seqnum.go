@@ -26,17 +26,21 @@ import (
 
 	"github.com/netsec-ethz/scion/go/border/digest"
 	"github.com/netsec-ethz/scion/go/border/conf"
+	//"github.com/netsec-ethz/scion/go/border/seqnumtest"
 	"github.com/netsec-ethz/scion/go/lib/common"
 	"github.com/netsec-ethz/scion/go/lib/spkt"
 	"crypto/hmac"
 	"crypto/md5"
 	"bytes"
 	//"github.com/netsec-ethz/scion/go/lib/assert"
+	"github.com/netsec-ethz/scion/go/border/seqnumtest"
 )
 
 var _ rExtension = (*rSeqNum)(nil)
 
 const MAC_LEN = 16
+
+const test_num_packet = 80 //depending on the number of packets sent from the pktgen.py
 
 
 // rSeqNum is the router's representation of the Seqnum extension.
@@ -76,11 +80,15 @@ func (t *rSeqNum) RegisterHooks(h *hooks) *common.Error {
 }
 
 func (t *rSeqNum) Process() (HookResult, *common.Error) {
-	s := fmt.Sprintf("the sequence number of this packet is %d", t.Num)
-	t.Logger.Debug(s)
+	start := seqnumtest.T_start()
+	defer seqnumtest.T_track(start, test_num_packet)
+	//return HookContinue, nil
+	//s := fmt.Sprintf("the sequence number of this packet is %d", t.Num)
+	//t.Logger.Debug(s)
 	seg_for_mac := []byte(t.rp.Raw[8:50])
 	//FIXME: the common header changes on the way. But need to think carefully which bits to use
 	//so that it 1. doesn't change on the way 2. uniquely distinguishes each packet
+
 
 	//if packet goes out from an AS
 	if strings.Compare(conf.C.IA.String(), t.rp.srcIA.String()) == 0{
@@ -91,7 +99,7 @@ func (t *rSeqNum) Process() (HookResult, *common.Error) {
 			offset += common.LineLen*i*2
 			asname := parseAs([]byte(t.raw[offset:offset+16]))
 			if _, ok := digest.D.Seq_info[asname]; !ok {
-				t.Logger.Debug("the As to be added at the time of assigning MAC is " + asname)
+				//t.Logger.Debug("the As to be added at the time of assigning MAC is " + asname)
 				digest.D.AddAsEntry(asname)
 			}
 			mac_code := computeMac(seg_for_mac, digest.D.Seq_info[asname].MacKey)
@@ -113,47 +121,46 @@ func (t *rSeqNum) Process() (HookResult, *common.Error) {
 
 		//authentication
 		if !t.authenticate(seg_for_mac, val.MacKey)  {
-			t.Logger.Debug("authentication failed")
+			//t.Logger.Debug("authentication failed")
 			return HookContinue, nil//common.NewError("authentication failed")
 		}else{
-			t.Logger.Debug("authentication passed")
+			//t.Logger.Debug("authentication passed")
 		}
 
 		//seq_num check
 		if !val.Valid {
 			val.Seq_num = t.Num
 			val.Valid = true
-			s := fmt.Sprintf("valid flag is set to %b, sequence number is %d", digest.D.Seq_info[t.rp.srcIA.String()].Valid, digest.D.Seq_info[t.rp.srcIA.String()].Seq_num)
-			t.Logger.Debug(s)
+			//s := fmt.Sprintf("valid flag is set to %b, sequence number is %d", digest.D.Seq_info[t.rp.srcIA.String()].Valid, digest.D.Seq_info[t.rp.srcIA.String()].Seq_num)
+			//t.Logger.Debug(s)
 		}
 		curr_seq := val.Seq_num
 		if (!checkSeqWin(t.Num, digest.D.Seq_num_window, curr_seq)){
 			//seq num out of sliding window.
-			ss := fmt.Sprintf("packet num is %d, stored num is %d ", t.Num, curr_seq)
 			//t.Logger.Debug(ss)
 			//t.Logger.Debug("seq num out of sliding window. Should drop this packet")
-			return HookContinue, common.NewError(ss,"seq num out of sliding window. Should drop this packet")
+			return HookContinue, common.NewError("seq num out of sliding window. Should drop this packet")
 		}else{
 			//check if need to update sequence number
 			if checkSeqUpdate(t.Num, curr_seq) {
-				aq := fmt.Sprintf("the stored seq num for %s is %d", t.rp.srcIA.String(), curr_seq)
-				t.Logger.Debug(aq)
+				//aq := fmt.Sprintf("the stored seq num for %s is %d", t.rp.srcIA.String(), curr_seq)
+				//t.Logger.Debug(aq)
 				val.Seq_num = t.Num
 				digest.TTLupdate(t.rp.srcIA.String(), 0)
-				a := fmt.Sprintf("the stored seq num for %s update to %d", t.rp.srcIA.String(), t.Num)
-				t.Logger.Debug(a)
+				//a := fmt.Sprintf("the stored seq num for %s update to %d", t.rp.srcIA.String(), t.Num)
+				//t.Logger.Debug(a)
 			}
 		}
 
 		//digest check
 		//use the seqnum extension header(which contains seqnum and all MAC code, enough for digest computation)
 		if digest.Check([]byte(t.raw)) {
-			t.Logger.Error("the digest is already in the digest store, should drop this packet")
+			//t.Logger.Error("the digest is already in the digest store, should drop this packet")
 			//e := common.NewError("the digest is already in the digest store, should drop this packet")
 			return HookContinue, nil
 		}
 		digest.Add([]byte(t.raw))
-		t.Logger.Debug("packet digest successfully added")
+		//t.Logger.Debug("packet digest successfully added")
 	}
 	return HookContinue, nil
 }

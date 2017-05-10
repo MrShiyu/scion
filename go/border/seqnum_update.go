@@ -2,9 +2,9 @@ package main
 
 import (
 	"time"
-	"fmt"
+	//"fmt"
 
-	log "github.com/inconshreveable/log15"
+	//log "github.com/inconshreveable/log15"
 	"github.com/netsec-ethz/scion/go/lib/log"
 	"github.com/netsec-ethz/scion/go/border/digest"
 )
@@ -17,11 +17,11 @@ func SeqNumInc() {
 	for range time.Tick(digest.SeqIncFreq) {
 		if digest.D.Curr_seq_num< seq_num_range {
 			digest.D.Curr_seq_num++
-			s := fmt.Sprintf("sequence number gets incremented to %d", digest.D.Curr_seq_num)
-			log.Debug(s)
+			//s := fmt.Sprintf("sequence number gets incremented to %d", digest.D.Curr_seq_num)
+			//log.Debug(s)
 		}else{
 			digest.D.Curr_seq_num = 0
-			log.Debug("seq num reset to 0")
+			//log.Debug("seq num reset to 0")
 		}
 	}
 }
@@ -56,12 +56,12 @@ func TTLoneAScheck(name string, conf *digest.Curr_seq){
 			digest.TTLupdate(name,augmented)
 			if digest.D.Seq_info[name].Seq_num< seq_num_range {
 				digest.D.Seq_info[name].Seq_num++
-				s := fmt.Sprintf("stored sequence number of AS %s gets incremented to %d", name, digest.D.Seq_info[name].Seq_num)
-				log.Debug(s)
+				//s := fmt.Sprintf("stored sequence number of AS %s gets incremented to %d", name, digest.D.Seq_info[name].Seq_num)
+				//log.Debug(s)
 			}else{
 				digest.D.Seq_info[name].Seq_num = 0
-				s:= fmt.Sprintf("stored seq num of AS %s reset to 0", name)
-				log.Debug(s)
+				//s:= fmt.Sprintf("stored seq num of AS %s reset to 0", name)
+				//log.Debug(s)
 			}
 		}
 	}

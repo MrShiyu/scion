@@ -32,9 +32,11 @@ import (
 	"github.com/netsec-ethz/scion/go/border/metrics"
 	"github.com/netsec-ethz/scion/go/border/netconf"
 	"github.com/netsec-ethz/scion/go/border/rpkt"
+	"github.com/netsec-ethz/scion/go/border/seqnumtest"
 	"github.com/netsec-ethz/scion/go/lib/common"
 	"github.com/netsec-ethz/scion/go/lib/overlay"
 	"github.com/netsec-ethz/scion/go/lib/spath"
+	//"github.com/netsec-ethz/scion/go/border/hsr"
 )
 
 type setupNetHook func(r *Router) (rpkt.HookResult, *common.Error)
@@ -63,6 +65,7 @@ func (r *Router) setup(confDir string) *common.Error {
 		return err
 	}
 	digest.Load(1000,1,2)
+	seqnumtest.Load()
 	log.Debug("Topology loaded", "topo", conf.C.BR)
 	log.Debug("AS Conf loaded", "conf", conf.C.ASConf)
 
