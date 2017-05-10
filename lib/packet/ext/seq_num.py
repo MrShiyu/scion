@@ -91,7 +91,7 @@ class SeqNumExt(HopByHopExtension):
         for s in maclist:
             if len(s) < inst.MAC_LEN:
                 diff = inst.MAC_LEN - len(s)
-                s + " " * diff
+                s += "x" * diff
             inst.macs.append(s.encode('utf-8'))
         return inst
 

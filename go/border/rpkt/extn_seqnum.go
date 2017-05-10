@@ -30,6 +30,7 @@ import (
 	"github.com/netsec-ethz/scion/go/lib/spkt"
 	"crypto/hmac"
 	"crypto/md5"
+	"bytes"
 	//"github.com/netsec-ethz/scion/go/lib/assert"
 )
 
@@ -38,7 +39,7 @@ var _ rExtension = (*rSeqNum)(nil)
 const MAC_LEN = 16
 
 
-// rTraceroute is the router's representation of the Traceroute extension.
+// rSeqNum is the router's representation of the Seqnum extension.
 type rSeqNum struct {
 	rp       *RtrPkt
 	Num      uint32
@@ -48,7 +49,6 @@ type rSeqNum struct {
 	mac	[]byte //here use md5, has the output length of 16 bytes
 	log.Logger
 }
-var myKEY = []byte{0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}
 
 // rSeqNumFromRaw creates an rSeqNum instance from raw bytes, keeping a
 // reference to the location in the packet's buffer.
@@ -76,9 +76,11 @@ func (t *rSeqNum) RegisterHooks(h *hooks) *common.Error {
 }
 
 func (t *rSeqNum) Process() (HookResult, *common.Error) {
-	s := fmt.Sprintf("the sequence number of this string is %d", t.Num)
+	s := fmt.Sprintf("the sequence number of this packet is %d", t.Num)
 	t.Logger.Debug(s)
-	seg_for_mac := []byte(t.rp.Raw[8:50])//the common header changes on the way
+	seg_for_mac := []byte(t.rp.Raw[8:50])
+	//FIXME: the common header changes on the way. But need to think carefully which bits to use
+	//so that it 1. doesn't change on the way 2. uniquely distinguishes each packet
 
 	//if packet goes out from an AS
 	if strings.Compare(conf.C.IA.String(), t.rp.srcIA.String()) == 0{
@@ -87,12 +89,14 @@ func (t *rSeqNum) Process() (HookResult, *common.Error) {
 		offset := common.ExtnFirstLineLen
 		for i:= 0; i < int(t.total_hop); i++ {
 			offset += common.LineLen*i*2
-			//TODO: parse the string to get the name of the As
-			mac_code := computeMac(seg_for_mac, myKEY)
+			asname := parseAs([]byte(t.raw[offset:offset+16]))
+			if _, ok := digest.D.Seq_info[asname]; !ok {
+				t.Logger.Debug("the As to be added at the time of assigning MAC is " + asname)
+				digest.D.AddAsEntry(asname)
+			}
+			mac_code := computeMac(seg_for_mac, digest.D.Seq_info[asname].MacKey)
 			copy(t.raw[offset:offset+16], mac_code)
 		}
-		s := fmt.Sprintf("the seq number changed to %d ", t.Num)
-		t.Logger.Debug(s)
 	}else{
 		//if packet goes through this router
 
@@ -142,12 +146,13 @@ func (t *rSeqNum) Process() (HookResult, *common.Error) {
 		}
 
 		//digest check
-		if digest.Check([]byte(t.rp.Raw)) {
+		//use the seqnum extension header(which contains seqnum and all MAC code, enough for digest computation)
+		if digest.Check([]byte(t.raw)) {
 			t.Logger.Error("the digest is already in the digest store, should drop this packet")
 			//e := common.NewError("the digest is already in the digest store, should drop this packet")
 			return HookContinue, nil
 		}
-		digest.Add([]byte(t.rp.Raw))
+		digest.Add([]byte(t.raw))
 		t.Logger.Debug("packet digest successfully added")
 	}
 	return HookContinue, nil
@@ -162,8 +167,6 @@ func computeMac(message, key []byte) []byte {
 
 func (t *rSeqNum)authenticate(message, key []byte) bool {
 	expectedMAC := computeMac(message, key)
-	//fmt.Println("the t raw used for computing mac is ", message)
-	//fmt.Println("the mac code computed  is " , expectedMAC)
 	t.curr_hop += 1
 	t.raw[4] = t.curr_hop
 	return hmac.Equal(t.mac, expectedMAC)
@@ -171,9 +174,11 @@ func (t *rSeqNum)authenticate(message, key []byte) bool {
 
 //here we assume the length of the macEntry is the valid length of a mac entry
 func parseAs(macEntry []byte) string{
-	//TODO: parse the string
-	return ""
+	n := bytes.Index(macEntry, []byte{'x'})
+	return string(macEntry[:n])
 }
+
+
 //check if the current num is within valid sequence number window
 func checkSeqWin(num, winsize, storedseq uint32) bool{
 	if storedseq <= winsize {
