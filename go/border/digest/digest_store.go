@@ -16,11 +16,11 @@
 // router's various packages.
 package digest
 
-import ("fmt"
+import (//"fmt"
 	"time"
 	//"strings"
 	"github.com/netsec-ethz/scion/go/border/conf"
-	log "github.com/inconshreveable/log15"
+	//log "github.com/inconshreveable/log15"
 )
 
 var defaultKEY = []byte{0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}
@@ -75,15 +75,15 @@ func (D *DigestStore)AddAsEntry(asname string){
 		Valid: false,
 		MacKey: defaultKEY}
 	D.Seq_info[asname] = &new_seq
-	log.Debug("create a new entry for " + asname)
-	ss := fmt.Sprintf("the As %s has sequence number %d initial TTL %d", asname,new_seq.Seq_num, int64(new_seq.TTL))
-	log.Debug(ss)
+	//log.Debug("create a new entry for " + asname)
+	//ss := fmt.Sprintf("the As %s has sequence number %d initial TTL %d", asname,new_seq.Seq_num, int64(new_seq.TTL))
+	//log.Debug(ss)
 }
 
 func Add(byte_str []byte){
 	D.filter[Writeable].BlockAdd(byte_str)
-	s := fmt.Sprintf("digest successfully added to filter %d", Writeable)
-	log.Debug(s)
+	//s := fmt.Sprintf("digest successfully added to filter %d", Writeable)
+	//log.Debug(s)
 }
 
 //Check if data is in the whole block filter

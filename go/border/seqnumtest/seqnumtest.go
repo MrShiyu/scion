@@ -42,10 +42,10 @@ func T_track(start time.Duration, count int){
 	elapsed := monotime.Since(start)
 	t.total_time += elapsed
 	t.exec_count += 1
-	if t.exec_count%40 == 0 {
-		s := fmt.Sprintf("%d packets processed", t.exec_count)
-		log.Debug(s)
-	}
+	//if t.exec_count%40 == 0 {
+	//	s := fmt.Sprintf("%d packets processed", t.exec_count)
+	//	log.Debug(s)
+	//}
 	if t.exec_count == count {
 		//log.Debug("the total elaped time is " + T.total_time.String())
 		average := t.total_time.Nanoseconds()/int64(t.exec_count)
@@ -53,6 +53,7 @@ func T_track(start time.Duration, count int){
 		converted := float64(average)/float64(1000)
 		s := fmt.Sprintf("the execution time per packet is %f microsecond", converted)
 		log.Debug(s)
+		t.exec_count = 0
 	}
 }
 

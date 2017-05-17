@@ -18,7 +18,7 @@
 package rpkt
 
 import (
-	"fmt"
+	//"fmt"
 	//"time"
 	"strings"
 
@@ -40,7 +40,7 @@ var _ rExtension = (*rSeqNum)(nil)
 
 const MAC_LEN = 16
 
-const test_num_packet = 80 //depending on the number of packets sent from the pktgen.py
+const test_num_packet = 10000
 
 
 // rSeqNum is the router's representation of the Seqnum extension.
@@ -68,8 +68,8 @@ func rSeqNumFromRaw(rp *RtrPkt, start, end int) (*rSeqNum, *common.Error) {
 	offset := common.ExtnFirstLineLen + common.LineLen * 2 * int(t.curr_hop)
 	t.mac = make([]byte, MAC_LEN)
 	copy(t.mac, t.raw[offset:offset+16])
-	fmt.Println("the t raw is ", t.raw[offset:offset+16], "current hop is ", t.curr_hop, "the t.mac is ", t.mac)
-	t.Logger = rp.Logger.New("ext", "sequenceNumber")
+	//fmt.Println("the t raw is ", t.raw[offset:offset+16], "current hop is ", t.curr_hop, "the t.mac is ", t.mac)
+	//t.Logger = rp.Logger.New("ext", "sequenceNumber")
 	return t, nil
 }
 
@@ -122,7 +122,7 @@ func (t *rSeqNum) Process() (HookResult, *common.Error) {
 		//authentication
 		if !t.authenticate(seg_for_mac, val.MacKey)  {
 			//t.Logger.Debug("authentication failed")
-			return HookContinue, nil//common.NewError("authentication failed")
+			return HookContinue, common.NewError("authentication failed")
 		}else{
 			//t.Logger.Debug("authentication passed")
 		}
@@ -139,7 +139,7 @@ func (t *rSeqNum) Process() (HookResult, *common.Error) {
 			//seq num out of sliding window.
 			//t.Logger.Debug(ss)
 			//t.Logger.Debug("seq num out of sliding window. Should drop this packet")
-			return HookContinue, common.NewError("seq num out of sliding window. Should drop this packet")
+			return HookContinue, nil//common.NewError("seq num out of sliding window. Should drop this packet")
 		}else{
 			//check if need to update sequence number
 			if checkSeqUpdate(t.Num, curr_seq) {
