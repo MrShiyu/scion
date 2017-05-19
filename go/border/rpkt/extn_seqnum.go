@@ -20,19 +20,19 @@ package rpkt
 import (
 	//"fmt"
 	//"time"
-	"strings"
 
 	log "github.com/inconshreveable/log15"
 
 	"github.com/netsec-ethz/scion/go/border/digest"
 	"github.com/netsec-ethz/scion/go/border/conf"
-	//"github.com/netsec-ethz/scion/go/border/seqnumtest"
 	"github.com/netsec-ethz/scion/go/lib/common"
 	"github.com/netsec-ethz/scion/go/lib/spkt"
 	"crypto/hmac"
 	"crypto/md5"
 	"bytes"
 	//"github.com/netsec-ethz/scion/go/lib/assert"
+	//"github.com/netsec-ethz/scion/go/border/seqnumtest"
+	//"github.com/netsec-ethz/scion/go/lib/addr"
 	"github.com/netsec-ethz/scion/go/border/seqnumtest"
 )
 
@@ -84,14 +84,18 @@ func (t *rSeqNum) Process() (HookResult, *common.Error) {
 	defer seqnumtest.T_track(start, test_num_packet)
 	//return HookContinue, nil
 	//s := fmt.Sprintf("the sequence number of this packet is %d", t.Num)
-	//t.Logger.Debug(s)
+	//log.Debug(s)
+	//srclen, _ := addr.HostLen(t.rp.CmnHdr.SrcType) == 4
+	//dstlen, _ := addr.HostLen(t.rp.CmnHdr.DstType)
+	//s := fmt.Sprintf("the length of l4 header + data is %d", (len(t.rp.Raw)-t.rp.idxs.nextHdrIdx.Index))
+	//log.Debug(s)
 	seg_for_mac := []byte(t.rp.Raw[8:50])
 	//FIXME: the common header changes on the way. But need to think carefully which bits to use
 	//so that it 1. doesn't change on the way 2. uniquely distinguishes each packet
 
 
 	//if packet goes out from an AS
-	if strings.Compare(conf.C.IA.String(), t.rp.srcIA.String()) == 0{
+	if (conf.C.IA.A == t.rp.srcIA.A) && (conf.C.IA.I == t.rp.srcIA.I){
 		t.Num = digest.D.Curr_seq_num
 		common.Order.PutUint32(t.raw[0:4], t.Num)
 		offset := common.ExtnFirstLineLen
@@ -166,18 +170,23 @@ func (t *rSeqNum) Process() (HookResult, *common.Error) {
 }
 
 
+//using hmac to compute MAC
 func computeMac(message, key []byte) []byte {
 	mac := hmac.New(md5.New, key)
 	mac.Write(message)
 	return mac.Sum(nil)
 }
-
+//using hmac to authenticate MAC
 func (t *rSeqNum)authenticate(message, key []byte) bool {
 	expectedMAC := computeMac(message, key)
 	t.curr_hop += 1
 	t.raw[4] = t.curr_hop
 	return hmac.Equal(t.mac, expectedMAC)
 }
+
+
+
+
 
 //here we assume the length of the macEntry is the valid length of a mac entry
 func parseAs(macEntry []byte) string{
@@ -212,7 +221,7 @@ func checkSeqUpdate(packetSeq, storedSeq uint32) bool{
 // between the two representations is that the latter doesn't have an
 // underlying buffer, so instead it has a slice of TracerouteEntry's.
 func (t *rSeqNum) GetExtn() (common.Extension, *common.Error) {
-	s := spkt.NewSeqNum() //FIXME: Change this when the defition of NewSeqNum is changed
+	s := spkt.NewSeqNum()
 	s.Num = t.Num
 	return s, nil
 }

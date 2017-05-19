@@ -54,6 +54,7 @@ func T_track(start time.Duration, count int){
 		s := fmt.Sprintf("the execution time per packet is %f microsecond", converted)
 		log.Debug(s)
 		t.exec_count = 0
+		t.total_time = 0*time.Nanosecond
 	}
 }
 
