@@ -27,18 +27,22 @@ import (
 	"github.com/netsec-ethz/scion/go/border/conf"
 	"github.com/netsec-ethz/scion/go/lib/common"
 	"github.com/netsec-ethz/scion/go/lib/spkt"
-	"crypto/hmac"
-	"crypto/md5"
+	//"crypto/hmac"
+	//"crypto/md5"
 	"bytes"
-	//"github.com/netsec-ethz/scion/go/lib/assert"
-	//"github.com/netsec-ethz/scion/go/border/seqnumtest"
+	"crypto/aes"
 	//"github.com/netsec-ethz/scion/go/lib/addr"
+	//"github.com/netsec-ethz/scion/go/border/seqnumtest"
+	"crypto/subtle"
+	"github.com/dchest/cmac"
 	"github.com/netsec-ethz/scion/go/border/seqnumtest"
 )
 
 var _ rExtension = (*rSeqNum)(nil)
 
 const MAC_LEN = 16
+
+const BLOCK_SIZE = 16 //the block size for aes encryption
 
 const test_num_packet = 10000
 
@@ -50,7 +54,7 @@ type rSeqNum struct {
 	curr_hop uint8
 	total_hop uint8
 	raw      common.RawBytes
-	mac	[]byte //here use md5, has the output length of 16 bytes
+	mac	[]byte
 	log.Logger
 }
 
@@ -67,7 +71,7 @@ func rSeqNumFromRaw(rp *RtrPkt, start, end int) (*rSeqNum, *common.Error) {
 	t.total_hop = uint8(len(t.raw)-common.ExtnFirstLineLen)/(common.LineLen * 2)
 	offset := common.ExtnFirstLineLen + common.LineLen * 2 * int(t.curr_hop)
 	t.mac = make([]byte, MAC_LEN)
-	copy(t.mac, t.raw[offset:offset+16])
+	copy(t.mac, t.raw[offset:offset+MAC_LEN])
 	//fmt.Println("the t raw is ", t.raw[offset:offset+16], "current hop is ", t.curr_hop, "the t.mac is ", t.mac)
 	//t.Logger = rp.Logger.New("ext", "sequenceNumber")
 	return t, nil
@@ -85,25 +89,20 @@ func (t *rSeqNum) Process() (HookResult, *common.Error) {
 	//return HookContinue, nil
 	//s := fmt.Sprintf("the sequence number of this packet is %d", t.Num)
 	//log.Debug(s)
-	//srclen, _ := addr.HostLen(t.rp.CmnHdr.SrcType) == 4
-	//dstlen, _ := addr.HostLen(t.rp.CmnHdr.DstType)
-	//s := fmt.Sprintf("the length of l4 header + data is %d", (len(t.rp.Raw)-t.rp.idxs.nextHdrIdx.Index))
 	//log.Debug(s)
-	seg_for_mac := []byte(t.rp.Raw[8:50])
-	//FIXME: the common header changes on the way. But need to think carefully which bits to use
-	//so that it 1. doesn't change on the way 2. uniquely distinguishes each packet
-
+	seg_for_mac := t.getBytesForMac()
 
 	//if packet goes out from an AS
 	if (conf.C.IA.A == t.rp.srcIA.A) && (conf.C.IA.I == t.rp.srcIA.I){
+		//assign sequence number
 		t.Num = digest.D.Curr_seq_num
 		common.Order.PutUint32(t.raw[0:4], t.Num)
 		offset := common.ExtnFirstLineLen
+		//compute and write mac
 		for i:= 0; i < int(t.total_hop); i++ {
 			offset += common.LineLen*i*2
 			asname := parseAs([]byte(t.raw[offset:offset+16]))
 			if _, ok := digest.D.Seq_info[asname]; !ok {
-				//t.Logger.Debug("the As to be added at the time of assigning MAC is " + asname)
 				digest.D.AddAsEntry(asname)
 			}
 			mac_code := computeMac(seg_for_mac, digest.D.Seq_info[asname].MacKey)
@@ -125,10 +124,10 @@ func (t *rSeqNum) Process() (HookResult, *common.Error) {
 
 		//authentication
 		if !t.authenticate(seg_for_mac, val.MacKey)  {
-			//t.Logger.Debug("authentication failed")
+			//log.Debug("authentication failed")
 			return HookContinue, common.NewError("authentication failed")
 		}else{
-			//t.Logger.Debug("authentication passed")
+			//log.Debug("authentication passed")
 		}
 
 		//seq_num check
@@ -170,21 +169,50 @@ func (t *rSeqNum) Process() (HookResult, *common.Error) {
 }
 
 
-//using hmac to compute MAC
+////using hmac to compute MAC
+//func computeMac(message, key []byte) []byte {
+//	mac := hmac.New(md5.New, key)
+//	mac.Write(message)
+//	return mac.Sum(nil)
+//}
+////using hmac to authenticate MAC
+//func (t *rSeqNum)authenticate(message, key []byte) bool {
+//	expectedMAC := computeMac(message, key)
+//	t.curr_hop += 1
+//	t.raw[4] = t.curr_hop
+//	return hmac.Equal(t.mac, expectedMAC)
+//}
+
+
+//using cmac to compute MAC
 func computeMac(message, key []byte) []byte {
-	mac := hmac.New(md5.New, key)
+	c, _ := aes.NewCipher(key)
+	mac,_ := cmac.New(c)
 	mac.Write(message)
 	return mac.Sum(nil)
 }
-//using hmac to authenticate MAC
+//using cmac to authenticate MAC
 func (t *rSeqNum)authenticate(message, key []byte) bool {
 	expectedMAC := computeMac(message, key)
 	t.curr_hop += 1
 	t.raw[4] = t.curr_hop
-	return hmac.Equal(t.mac, expectedMAC)
+	return subtle.ConstantTimeCompare(t.mac, expectedMAC) == 1
 }
 
 
+
+func (t *rSeqNum) getBytesForMac() []byte{
+	head_length := t.rp.idxs.path
+	l4index := t.rp.idxs.nextHdrIdx.Index
+	length := head_length + (len(t.rp.Raw)-l4index)
+	length = length - length%BLOCK_SIZE //make the length multiple of blocksize
+	buffer := make([]byte, length)
+	copy(buffer[:head_length], t.rp.Raw[:head_length])
+	copy(buffer[head_length:], t.rp.Raw[l4index:(length-head_length)])
+	buffer[5] = 0
+	buffer[6] = 0
+	return buffer
+}
 
 
 

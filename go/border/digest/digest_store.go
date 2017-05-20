@@ -24,6 +24,7 @@ import (//"fmt"
 )
 
 var defaultKEY = []byte{0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}
+//key length for AES could be 128bit
 
 // Conf is the main digest structure.
 type DigestStore struct {
