@@ -51,7 +51,7 @@ func T_track(start time.Duration, count int){
 		average := t.total_time.Nanoseconds()/int64(t.exec_count)
 		//convert to microsecond
 		converted := float64(average)/float64(1000)
-		s := fmt.Sprintf("the execution time per packet is %f microsecond", converted)
+		s := fmt.Sprintf("the execution time per packet for master branch is %f microsecond", converted)
 		log.Debug(s)
 		t.exec_count = 0
 		t.total_time = 0*time.Nanosecond
