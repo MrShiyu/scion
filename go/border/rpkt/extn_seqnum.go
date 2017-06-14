@@ -18,7 +18,7 @@
 package rpkt
 
 import (
-	//"fmt"
+	"fmt"
 	//"time"
 
 	log "github.com/inconshreveable/log15"
@@ -35,7 +35,7 @@ import (
 	//"github.com/netsec-ethz/scion/go/border/seqnumtest"
 	"crypto/subtle"
 	"github.com/dchest/cmac"
-	"github.com/netsec-ethz/scion/go/border/seqnumtest"
+	//"github.com/netsec-ethz/scion/go/border/seqnumtest"
 )
 
 var _ rExtension = (*rSeqNum)(nil)
@@ -84,11 +84,11 @@ func (t *rSeqNum) RegisterHooks(h *hooks) *common.Error {
 }
 
 func (t *rSeqNum) Process() (HookResult, *common.Error) {
-	start := seqnumtest.T_start()
-	defer seqnumtest.T_track(start, test_num_packet)
+	//start := seqnumtest.T_start()
+	//defer seqnumtest.T_track(start, test_num_packet)
 	//return HookContinue, nil
-	//s := fmt.Sprintf("the sequence number of this packet is %d", t.Num)
-	//log.Debug(s)
+	s := fmt.Sprintf("the sequence number of this packet is %d", t.Num)
+	log.Debug(s)
 	//log.Debug(s)
 	seg_for_mac := t.getBytesForMac()
 
@@ -97,6 +97,8 @@ func (t *rSeqNum) Process() (HookResult, *common.Error) {
 		//assign sequence number
 		t.Num = digest.D.Curr_seq_num
 		common.Order.PutUint32(t.raw[0:4], t.Num)
+		s := fmt.Sprintf("the sequence number of this packet is changed to %d", t.Num)
+		log.Debug(s)
 		offset := common.ExtnFirstLineLen
 		//compute and write mac
 		for i:= 0; i < int(t.total_hop); i++ {
@@ -134,36 +136,37 @@ func (t *rSeqNum) Process() (HookResult, *common.Error) {
 		if !val.Valid {
 			val.Seq_num = t.Num
 			val.Valid = true
-			//s := fmt.Sprintf("valid flag is set to %b, sequence number is %d", digest.D.Seq_info[t.rp.srcIA.String()].Valid, digest.D.Seq_info[t.rp.srcIA.String()].Seq_num)
-			//t.Logger.Debug(s)
+			digest.TTLupdate(t.rp.srcIA.String(), 0)
+			s := fmt.Sprintf("valid flag is set to %b, sequence number is %d", digest.D.Seq_info[t.rp.srcIA.String()].Valid, digest.D.Seq_info[t.rp.srcIA.String()].Seq_num)
+			log.Debug(s)
 		}
 		curr_seq := val.Seq_num
-		if (!checkSeqWin(t.Num, digest.D.Seq_num_window, curr_seq)){
-			//seq num out of sliding window.
-			//t.Logger.Debug(ss)
-			//t.Logger.Debug("seq num out of sliding window. Should drop this packet")
-			return HookContinue, nil//common.NewError("seq num out of sliding window. Should drop this packet")
-		}else{
-			//check if need to update sequence number
-			if checkSeqUpdate(t.Num, curr_seq) {
-				//aq := fmt.Sprintf("the stored seq num for %s is %d", t.rp.srcIA.String(), curr_seq)
-				//t.Logger.Debug(aq)
-				val.Seq_num = t.Num
-				digest.TTLupdate(t.rp.srcIA.String(), 0)
-				//a := fmt.Sprintf("the stored seq num for %s update to %d", t.rp.srcIA.String(), t.Num)
-				//t.Logger.Debug(a)
+
+		if checkAhead(t.Num, curr_seq, digest.Seq_num_range){
+			aq := fmt.Sprintf("the stored seq num for %s is %d", t.rp.srcIA.String(), curr_seq)
+			log.Debug(aq)
+			val.Seq_num = t.Num
+			digest.TTLupdate(t.rp.srcIA.String(), 0)
+			a := fmt.Sprintf("the stored seq num for %s update to %d", t.rp.srcIA.String(), t.Num)
+			log.Debug(a)
+		}else {
+			if !checkSeqWin(t.Num, digest.D.Seq_num_window, curr_seq, digest.Seq_num_range) {
+				//seq num out of sliding window.
+				//t.Logger.Debug(ss)
+				log.Debug("seq num out of seqnum window. Should drop this packet")
+				return HookContinue, nil//common.NewError("seq num out of sliding window. Should drop this packet")
 			}
 		}
 
 		//digest check
 		//use the seqnum extension header(which contains seqnum and all MAC code, enough for digest computation)
 		if digest.Check([]byte(t.raw)) {
-			//t.Logger.Error("the digest is already in the digest store, should drop this packet")
+			//log.Error("the digest is already in the digest store, should drop this packet")
 			//e := common.NewError("the digest is already in the digest store, should drop this packet")
 			return HookContinue, nil
 		}
 		digest.Add([]byte(t.raw))
-		//t.Logger.Debug("packet digest successfully added")
+		log.Debug("packet digest successfully added")
 	}
 	return HookContinue, nil
 }
@@ -222,32 +225,26 @@ func parseAs(macEntry []byte) string{
 	return string(macEntry[:n])
 }
 
+//return true if packetseq is ahead of storedseq
+func checkAhead(packetseq, storedseq, totalseq uint32) bool{
+	return (storedseq - packetseq)%totalseq > (packetseq - storedseq)%totalseq
+}
 
-//check if the current num is within valid sequence number window
-func checkSeqWin(num, winsize, storedseq uint32) bool{
-	if storedseq <= winsize {
-		if num>=0 && num <= storedseq {return true}
-		if num> storedseq && (storedseq +digest.Seq_num_range - num)<= winsize {return true}
-		//consider wrap around
-		return false
-	}else{
-		if num + digest.Seq_num_range - storedseq < winsize {return true}
-		//FIXME: at wrap around time, set a limit as winsize, so that we consider the wrap around packet seq num as bigger
-		//the limit can be discussed
-		return num + winsize >= storedseq
+//return true if packetseq is within seqNo window
+//this function works with the assumption that packetseq is behind storedseq
+func checkSeqWin(packetseq, winsize, storedseq, totalseq uint32) bool{
+	if packetseq > storedseq {
+		storedseq = storedseq + totalseq
 	}
-
+	return packetseq + winsize >= storedseq
 }
 
-func checkSeqUpdate(packetSeq, storedSeq uint32) bool{
-	if packetSeq + digest.Seq_num_range - storedSeq <= digest.D.Seq_num_window { return true}
-	//FIXME: at wrap around time, set a limit as winsize, so that we consider the wrap around packet seq num as bigger
-	return packetSeq > storedSeq
-}
+
 
 // GetExtn returns the spkt.SeqNum representation. The big difference
 // between the two representations is that the latter doesn't have an
 // underlying buffer, so instead it has a slice of TracerouteEntry's.
+
 func (t *rSeqNum) GetExtn() (common.Extension, *common.Error) {
 	s := spkt.NewSeqNum()
 	s.Num = t.Num

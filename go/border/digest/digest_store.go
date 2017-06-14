@@ -114,7 +114,7 @@ func Rotate() {
 
 const SeqIncFreq = 10 * time.Millisecond
 
-const delta = time.Microsecond //account for clock askew
+const delta = time.Millisecond //account for clock askew
 
 const SeqIncplusDelta = SeqIncFreq + delta
 

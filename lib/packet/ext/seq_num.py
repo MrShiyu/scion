@@ -33,7 +33,7 @@ class SeqNumExt(HopByHopExtension):
     | xxxxxxxxxxxxxxxxxxxxxxxx | Sequence Number                   |hop_no  |
     +--------+--------+--------+--------+--------+--------+--------+--------+
     +--------+--------+--------+--------+--------+--------+--------+--------+
-    |     Mac of ISD_0 (use MD5, ouput 16 bytes, two line)                                     |
+    |     Mac of ISD_0 (use CMAC, output 16 bytes, two lines)                                     |
     +--------+--------+--------+--------+--------+--------+--------+--------+
     .............more Macs for more ISDs on the forwarding path..............
     
