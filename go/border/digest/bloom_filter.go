@@ -109,7 +109,7 @@ func (set *BlockedFilter) Reset() {
 //initialize a new block bloom filter. Args: capacity: the number of items to be inserted in this filter
 //size: the number of bits in this filter, expressed in KB
 //FalsePositiveRate can be calculated: e^(size(in bit)*log(1/(2^log2))/capacity)
-func NewBlockedBloomFilter(capacity, size int) BlockedFilter {
+func NewBlockedBloomFilter(numHashes, size int) BlockedFilter {
 	//numBits: hardcoded as 64bytes(64*8 bits)
 	NumBits := 64 * 8
 	//size: the size of the whole block filter = m*N, unit: KB
@@ -117,7 +117,7 @@ func NewBlockedBloomFilter(capacity, size int) BlockedFilter {
 	//each bucket is one uint32, used for storing bits
 	numBuckets := NumBits / 32
 	//numHashes can also be set as independent variable, while capacity dependent. Depending on the demand
-	numHashes := int(math.Floor(float64((NumBits * numBlocks / capacity)) * math.Log(2)))
+	capacity := int(math.Floor(float64((NumBits * numBlocks / numHashes)) * math.Log(2)))
 
 	newSpec := BloomFilter_spec{
 		Capacity:   capacity,

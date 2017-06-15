@@ -26,7 +26,7 @@ func SeqNumInc() {
 	}
 }
 
-const rotateFreq = 100 *time.Millisecond
+const rotateFreq = 121 *time.Millisecond
 
 func BfRotate(){
 	defer liblog.PanicLog()

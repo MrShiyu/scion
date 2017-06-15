@@ -64,7 +64,7 @@ func (r *Router) setup(confDir string) *common.Error {
 	if err := conf.Load(r.Id, confDir); err != nil {
 		return err
 	}
-	digest.Load(1000,1,2)
+	digest.Load(11,8000,2)
 	seqnumtest.Load()
 	log.Debug("Topology loaded", "topo", conf.C.BR)
 	log.Debug("AS Conf loaded", "conf", conf.C.ASConf)

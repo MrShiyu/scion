@@ -49,29 +49,29 @@ type Curr_seq struct{
 var D *DigestStore
 
 // Load sets up the configuration, loading it from the supplied config directory.
-func Load(capacity, size, number int) {
+func Load(numHashes, size, number int) {
 	// Declare a new Conf instance, and load the topology config.
 	digest := &DigestStore{}
 	digest.Curr_seq_num = 0
 	filter := make([]BlockedFilter, number)
 	digest.length = number
 	for i := 0; i < number; i++ {
-		filter[i] = NewBlockedBloomFilter(capacity, size)
+		filter[i] = NewBlockedBloomFilter(numHashes, size)
 	}
 	digest.filter = filter
-	digest.Seq_num_window = 20 //FIXME: number needs discussing
+	digest.Seq_num_window = 11 //FIXME: number needs discussing
 	info := make(map[string]*Curr_seq)
 	digest.Seq_info = info
 	// Save Digest
 	D = digest
 	for _, ifs := range conf.C.TopoMeta.IFMap{
 		v:= ifs.IF.IA.String()
-		D.AddAsEntry(v)
+		D.AddAsEntry(v,0)
 	}
 }
 
-func (D *DigestStore)AddAsEntry(asname string){
-	new_seq := Curr_seq{Seq_num: 0,
+func (D *DigestStore)AddAsEntry(asname string, seqNum uint32){
+	new_seq := Curr_seq{Seq_num: seqNum,
 		TTL: SeqIncplusDelta,
 		Valid: false,
 		MacKey: defaultKEY}

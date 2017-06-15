@@ -105,7 +105,7 @@ func (t *rSeqNum) Process() (HookResult, *common.Error) {
 			offset += common.LineLen*i*2
 			asname := parseAs([]byte(t.raw[offset:offset+16]))
 			if _, ok := digest.D.Seq_info[asname]; !ok {
-				digest.D.AddAsEntry(asname)
+				digest.D.AddAsEntry(asname,0)
 			}
 			mac_code := computeMac(seg_for_mac, digest.D.Seq_info[asname].MacKey)
 			copy(t.raw[offset:offset+16], mac_code)
@@ -120,7 +120,7 @@ func (t *rSeqNum) Process() (HookResult, *common.Error) {
 
 		//add seq info entry if not existed
 		if _, ok := digest.D.Seq_info[t.rp.srcIA.String()]; !ok {
-			digest.D.AddAsEntry(t.rp.srcIA.String())
+			digest.D.AddAsEntry(t.rp.srcIA.String(), t.Num)
 		}
 		val := digest.D.Seq_info[t.rp.srcIA.String()]
 
