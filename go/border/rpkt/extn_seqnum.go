@@ -153,8 +153,8 @@ func (t *rSeqNum) Process() (HookResult, *common.Error) {
 			if !checkSeqWin(t.Num, digest.D.Seq_num_window, curr_seq, digest.Seq_num_range) {
 				//seq num out of sliding window.
 				//t.Logger.Debug(ss)
-				log.Debug("seq num out of seqnum window. Should drop this packet")
-				return HookContinue, nil//common.NewError("seq num out of sliding window. Should drop this packet")
+				//log.Debug("seq num out of seqnum window. Should drop this packet")
+				return HookContinue, common.NewError("seq num out of sliding window. Should drop this packet")
 			}
 		}
 

@@ -35,11 +35,10 @@ func BfRotate(){
 	}
 }
 
-const TTLcheckFreq = 5*time.Millisecond
 
 func TTLcheck(){
 	defer liblog.PanicLog()
-	for range time.Tick(TTLcheckFreq){
+	for range time.Tick(digest.TTLcheckFreq){
 		for k,v := range digest.D.Seq_info{
 			TTLoneAScheck(k,v)
 		}
@@ -48,7 +47,7 @@ func TTLcheck(){
 
 func TTLoneAScheck(name string, conf *digest.Curr_seq){
 	if conf.Valid {
-		digest.D.Seq_info[name].TTL -= TTLcheckFreq
+		digest.D.Seq_info[name].TTL -= digest.TTLcheckFreq
 		//s:= fmt.Sprintf("the TTL after subtracting is %d", digest.D.Seq_info[name].TTL)
 		//log.Debug(s)
 		if conf.TTL <= 0{

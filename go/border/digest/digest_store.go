@@ -35,7 +35,7 @@ type DigestStore struct {
 	length         int
 }
 
-const Seq_num_range = 100
+const Seq_num_range = 1000000
 
 //information needed for sequence number update
 type Curr_seq struct{
@@ -114,13 +114,15 @@ func Rotate() {
 
 const SeqIncFreq = 10 * time.Millisecond
 
+const TTLcheckFreq = 5*time.Millisecond
+
 const delta = time.Millisecond //account for clock askew
 
 const SeqIncplusDelta = SeqIncFreq + delta
 
 func TTLupdate(as string, augment time.Duration){
 	//augment is a negative TTL that remains from the last session
-	D.Seq_info[as].TTL = SeqIncplusDelta + augment
+	D.Seq_info[as].TTL = SeqIncplusDelta + TTLcheckFreq + augment
 	//s:=fmt.Sprintf("the TTL of the sequence number for %s is reinitialized to %d", as, D.Seq_info[as].TTL)
 	//log.Debug(s)
 }
