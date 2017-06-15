@@ -18,7 +18,7 @@
 package rpkt
 
 import (
-	"fmt"
+	//"fmt"
 	//"time"
 
 	log "github.com/inconshreveable/log15"
@@ -87,8 +87,8 @@ func (t *rSeqNum) Process() (HookResult, *common.Error) {
 	//start := seqnumtest.T_start()
 	//defer seqnumtest.T_track(start, test_num_packet)
 	//return HookContinue, nil
-	s := fmt.Sprintf("the sequence number of this packet is %d", t.Num)
-	log.Debug(s)
+	//s := fmt.Sprintf("the sequence number of this packet is %d", t.Num)
+	//log.Debug(s)
 	//log.Debug(s)
 	seg_for_mac := t.getBytesForMac()
 
@@ -97,8 +97,8 @@ func (t *rSeqNum) Process() (HookResult, *common.Error) {
 		//assign sequence number
 		t.Num = digest.D.Curr_seq_num
 		common.Order.PutUint32(t.raw[0:4], t.Num)
-		s := fmt.Sprintf("the sequence number of this packet is changed to %d", t.Num)
-		log.Debug(s)
+		//s := fmt.Sprintf("the sequence number of this packet is changed to %d", t.Num)
+		//log.Debug(s)
 		offset := common.ExtnFirstLineLen
 		//compute and write mac
 		for i:= 0; i < int(t.total_hop); i++ {
@@ -137,24 +137,24 @@ func (t *rSeqNum) Process() (HookResult, *common.Error) {
 			val.Seq_num = t.Num
 			val.Valid = true
 			digest.TTLupdate(t.rp.srcIA.String(), 0)
-			s := fmt.Sprintf("valid flag is set to %b, sequence number is %d", digest.D.Seq_info[t.rp.srcIA.String()].Valid, digest.D.Seq_info[t.rp.srcIA.String()].Seq_num)
-			log.Debug(s)
+			//s := fmt.Sprintf("valid flag is set to %b, sequence number is %d", digest.D.Seq_info[t.rp.srcIA.String()].Valid, digest.D.Seq_info[t.rp.srcIA.String()].Seq_num)
+			//log.Debug(s)
 		}
 		curr_seq := val.Seq_num
 
 		if checkAhead(t.Num, curr_seq, digest.Seq_num_range){
-			aq := fmt.Sprintf("the stored seq num for %s is %d", t.rp.srcIA.String(), curr_seq)
-			log.Debug(aq)
+			//aq := fmt.Sprintf("the stored seq num for %s is %d", t.rp.srcIA.String(), curr_seq)
+			//log.Debug(aq)
 			val.Seq_num = t.Num
 			digest.TTLupdate(t.rp.srcIA.String(), 0)
-			a := fmt.Sprintf("the stored seq num for %s update to %d", t.rp.srcIA.String(), t.Num)
-			log.Debug(a)
+			//a := fmt.Sprintf("the stored seq num for %s update to %d", t.rp.srcIA.String(), t.Num)
+			//log.Debug(a)
 		}else {
 			if !checkSeqWin(t.Num, digest.D.Seq_num_window, curr_seq, digest.Seq_num_range) {
 				//seq num out of sliding window.
 				//t.Logger.Debug(ss)
-				log.Debug("seq num out of seqnum window. Should drop this packet")
-				return HookContinue, nil//common.NewError("seq num out of sliding window. Should drop this packet")
+				//log.Debug("seq num out of seqnum window. Should drop this packet")
+				return HookContinue, common.NewError("seq num out of sliding window. Should drop this packet")
 			}
 		}
 
@@ -166,7 +166,7 @@ func (t *rSeqNum) Process() (HookResult, *common.Error) {
 			return HookContinue, nil
 		}
 		digest.Add([]byte(t.raw))
-		log.Debug("packet digest successfully added")
+		//log.Debug("packet digest successfully added")
 	}
 	return HookContinue, nil
 }

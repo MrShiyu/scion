@@ -2,9 +2,9 @@ package main
 
 import (
 	"time"
-	"fmt"
+	//"fmt"
 
-	log "github.com/inconshreveable/log15"
+	//log "github.com/inconshreveable/log15"
 	"github.com/netsec-ethz/scion/go/lib/log"
 	"github.com/netsec-ethz/scion/go/border/digest"
 )
@@ -35,11 +35,10 @@ func BfRotate(){
 	}
 }
 
-const TTLcheckFreq = 5*time.Millisecond
 
 func TTLcheck(){
 	defer liblog.PanicLog()
-	for range time.Tick(TTLcheckFreq){
+	for range time.Tick(digest.TTLcheckFreq){
 		for k,v := range digest.D.Seq_info{
 			TTLoneAScheck(k,v)
 		}
@@ -48,7 +47,7 @@ func TTLcheck(){
 
 func TTLoneAScheck(name string, conf *digest.Curr_seq){
 	if conf.Valid {
-		digest.D.Seq_info[name].TTL -= TTLcheckFreq
+		digest.D.Seq_info[name].TTL -= digest.TTLcheckFreq
 		//s:= fmt.Sprintf("the TTL after subtracting is %d", digest.D.Seq_info[name].TTL)
 		//log.Debug(s)
 		if conf.TTL <= 0{
@@ -56,8 +55,8 @@ func TTLoneAScheck(name string, conf *digest.Curr_seq){
 			digest.TTLupdate(name,augmented)
 			if digest.D.Seq_info[name].Seq_num< seq_num_range - 1 {
 				digest.D.Seq_info[name].Seq_num++
-				s := fmt.Sprintf("stored sequence number of AS %s gets incremented to %d", name, digest.D.Seq_info[name].Seq_num)
-				log.Debug(s)
+				//s := fmt.Sprintf("stored sequence number of AS %s gets incremented to %d", name, digest.D.Seq_info[name].Seq_num)
+				//log.Debug(s)
 			}else{
 				digest.D.Seq_info[name].Seq_num = 0
 				//s:= fmt.Sprintf("stored seq num of AS %s reset to 0", name)

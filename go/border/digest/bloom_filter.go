@@ -3,6 +3,7 @@ package digest
 import (
 	"hash/fnv"
 	"math"
+	murmur "github.com/spaolacci/murmur3"
 )
 
 //this is an implementation of blocked bloom filter
@@ -28,11 +29,13 @@ type BlockedFilter struct {
 }
 
 //hash function used within each block, can be used to generate different hash functions
-func hashFNV1a(input []byte) (uint32, uint32) {
-	hash := fnv.New64a()
+func hashMurMur(input []byte) (uint32, uint32) {
+	hash := murmur.New32()
 	hash.Write(input)
-	value64 := hash.Sum64()
-	return uint32(value64 & 0xFFFFFFFF), uint32(value64 >> 32) //getting the first 32 bits, and the last 32 bits of the hash value
+	value1 := hash.Sum32()
+	hash.Write([]byte{1})
+	value2 := hash.Sum32()
+	return value1, value2 //getting the first 32 bits, and the last 32 bits of the hash value
 }
 
 //hash function used for determining which block to insert
@@ -62,7 +65,7 @@ func (set *BloomFilter) testBit(index, numBuckets int) int {
 
 // Add data to one block, called by function BlockAdd
 func (set *BloomFilter) add(input []byte, NumHashes, NumBits, NumBuckets int) {
-	hashA, hashB := hashFNV1a(input)
+	hashA, hashB := hashMurMur(input)
 	for i := 0; i < NumHashes; i++ {
 		index := int((hashA + hashB*uint32(i))) % NumBits
 		//simulate different hash functions by doing gi(x) = h1(x) + ih2(x).
@@ -80,7 +83,7 @@ func (set *BlockedFilter) BlockAdd(input []byte) {
 
 // Check if data exist in one block, called by function BlockCheck
 func (set *BloomFilter) check(input []byte, NumHashes int, NumBits int, NumBuckets int) bool {
-	hashA, hashB := hashFNV1a(input)
+	hashA, hashB := hashMurMur(input)
 	for i := 0; i < NumHashes; i++ {
 		index := int((hashA + hashB*uint32(i))) % NumBits
 		if set.testBit(index, NumBuckets) != 1 {

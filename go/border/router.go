@@ -31,6 +31,7 @@ import (
 	"github.com/netsec-ethz/scion/go/lib/spath"
 
 	//"fmt"
+	"github.com/netsec-ethz/scion/go/border/seqnumtest"
 )
 
 type Router struct {
@@ -91,11 +92,14 @@ func (r *Router) handleQueue(q chan *rpkt.RtrPkt) {
 		r.recyclePkt(rp)
 	}
 }
+const test_num_packet = 5000
 
 // processPacket is the heart of the router's packet handling. It delegates
 // everything from parsing the incoming packet, to routing the outgoing packet.
 func (r *Router) processPacket(rp *rpkt.RtrPkt) {
 	defer liblog.PanicLog()
+	start := seqnumtest.T_start()
+	defer seqnumtest.T_track(start, test_num_packet)
 	if assert.On {
 		assert.Must(len(rp.Raw) > 0, "Raw must not be empty")
 		assert.Must(rp.DirFrom != rpkt.DirUnset, "DirFrom must be set")
