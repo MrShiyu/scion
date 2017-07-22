@@ -69,12 +69,6 @@ class SeqNumExt(HopByHopExtension):
         mac_list = list(struct.unpack("!16b", data.pop(self.MAC_LEN * self.curr_hop)))
         for mac in mac_list:
             self.macs.append(mac)
-        #for a, b, c, d in zip(mac_list[0::4], mac_list[1::4], mac_list[2::4], mac_list[3::4]):
-        #    isdas = a+b+c+d
-        #    self.macs.append(isdas)
-        print("seq_num successfully parsed, the sequence number is " + str(self.seq_num))
-        print("the mac list is " + str(mac_list))
-
 
 
 
@@ -108,8 +102,7 @@ class SeqNumExt(HopByHopExtension):
             packed.append(struct.pack("!16s", mac))
         raw = b"".join(packed)
         self._check_len(raw)
-        print("seq_num successfully packed, the sequence number is " + str(self.seq_num))
-        print("current hop is " + str(self.curr_hop))
+        print("space for seq_num successfully allocated, the placeholder sequence number is " + str(self.seq_num))
         print("the macs are " + str(self.macs))
         return raw
 

@@ -18,9 +18,6 @@
 package rpkt
 
 import (
-	"fmt"
-	//"time"
-
 	log "github.com/inconshreveable/log15"
 
 	"github.com/netsec-ethz/scion/go/border/digest"
@@ -28,14 +25,11 @@ import (
 	"github.com/netsec-ethz/scion/go/lib/common"
 	"github.com/netsec-ethz/scion/go/lib/spkt"
 	//"crypto/hmac"
-	//"crypto/md5"
 	"bytes"
 	"crypto/aes"
-	//"github.com/netsec-ethz/scion/go/lib/addr"
 	//"github.com/netsec-ethz/scion/go/border/seqnumtest"
 	"crypto/subtle"
 	"github.com/dchest/cmac"
-	//"github.com/netsec-ethz/scion/go/border/seqnumtest"
 )
 
 var _ rExtension = (*rSeqNum)(nil)
@@ -44,7 +38,6 @@ const MAC_LEN = 16
 
 const BLOCK_SIZE = 16 //the block size for aes encryption
 
-const test_num_packet = 10000
 
 
 // rSeqNum is the router's representation of the Seqnum extension.
@@ -72,8 +65,6 @@ func rSeqNumFromRaw(rp *RtrPkt, start, end int) (*rSeqNum, *common.Error) {
 	offset := common.ExtnFirstLineLen + common.LineLen * 2 * int(t.curr_hop)
 	t.mac = make([]byte, MAC_LEN)
 	copy(t.mac, t.raw[offset:offset+MAC_LEN])
-	//fmt.Println("the t raw is ", t.raw[offset:offset+16], "current hop is ", t.curr_hop, "the t.mac is ", t.mac)
-	//t.Logger = rp.Logger.New("ext", "sequenceNumber")
 	return t, nil
 }
 
@@ -84,21 +75,12 @@ func (t *rSeqNum) RegisterHooks(h *hooks) *common.Error {
 }
 
 func (t *rSeqNum) Process() (HookResult, *common.Error) {
-	//start := seqnumtest.T_start()
-	//defer seqnumtest.T_track(start, test_num_packet)
-	//return HookContinue, nil
-	s := fmt.Sprintf("the sequence number of this packet is %d", t.Num)
-	log.Debug(s)
-	//log.Debug(s)
 	seg_for_mac := t.getBytesForMac()
-
-	//if packet goes out from an AS
+	//egress border router in the source AS
 	if (conf.C.IA.A == t.rp.srcIA.A) && (conf.C.IA.I == t.rp.srcIA.I){
 		//assign sequence number
 		t.Num = digest.D.Curr_seq_num
 		common.Order.PutUint32(t.raw[0:4], t.Num)
-		s := fmt.Sprintf("the sequence number of this packet is changed to %d", t.Num)
-		log.Debug(s)
 		offset := common.ExtnFirstLineLen
 		//compute and write mac
 		for i:= 0; i < int(t.total_hop); i++ {
@@ -111,13 +93,14 @@ func (t *rSeqNum) Process() (HookResult, *common.Error) {
 			copy(t.raw[offset:offset+16], mac_code)
 		}
 	}else{
-		//if packet goes through this router
+		//border router in transit/destination ASes
 
-		//if it comes from border router in the same AS
+		//egress border router in transit/destination ASes
 		if t.rp.DirFrom == DirLocal{
 			return HookContinue, nil
 		}
 
+		//ingress border router in transit/destination ASes
 		//add seq info entry if not existed
 		if _, ok := digest.D.Seq_info[t.rp.srcIA.String()]; !ok {
 			digest.D.AddAsEntry(t.rp.srcIA.String(), t.Num)
@@ -126,10 +109,8 @@ func (t *rSeqNum) Process() (HookResult, *common.Error) {
 
 		//authentication
 		if !t.authenticate(seg_for_mac, val.MacKey)  {
-			//log.Debug("authentication failed")
 			return HookContinue, common.NewError("authentication failed")
 		}else{
-			//log.Debug("authentication passed")
 		}
 
 		//seq_num check
@@ -137,23 +118,16 @@ func (t *rSeqNum) Process() (HookResult, *common.Error) {
 			val.Seq_num = t.Num
 			val.Valid = true
 			digest.TTLupdate(t.rp.srcIA.String(), 0)
-			s := fmt.Sprintf("valid flag is set to %b, sequence number is %d", digest.D.Seq_info[t.rp.srcIA.String()].Valid, digest.D.Seq_info[t.rp.srcIA.String()].Seq_num)
-			log.Debug(s)
+
 		}
 		curr_seq := val.Seq_num
 
 		if checkAhead(t.Num, curr_seq, digest.Seq_num_range){
-			aq := fmt.Sprintf("the stored seq num for %s is %d", t.rp.srcIA.String(), curr_seq)
-			log.Debug(aq)
 			val.Seq_num = t.Num
 			digest.TTLupdate(t.rp.srcIA.String(), 0)
-			a := fmt.Sprintf("the stored seq num for %s update to %d", t.rp.srcIA.String(), t.Num)
-			log.Debug(a)
 		}else {
 			if !checkSeqWin(t.Num, digest.D.Seq_num_window, curr_seq, digest.Seq_num_range) {
 				//seq num out of sliding window.
-				//t.Logger.Debug(ss)
-				//log.Debug("seq num out of seqnum window. Should drop this packet")
 				return HookContinue, common.NewError("seq num out of sliding window. Should drop this packet")
 			}
 		}
@@ -161,12 +135,10 @@ func (t *rSeqNum) Process() (HookResult, *common.Error) {
 		//digest check
 		//use the seqnum extension header(which contains seqnum and all MAC code, enough for digest computation)
 		if digest.Check([]byte(t.raw)) {
-			//log.Error("the digest is already in the digest store, should drop this packet")
-			//e := common.NewError("the digest is already in the digest store, should drop this packet")
-			return HookContinue, nil
+			e := common.NewError("the digest is already in the digest store, should drop this packet")
+			return HookContinue, e
 		}
 		digest.Add([]byte(t.raw))
-		log.Debug("packet digest successfully added")
 	}
 	return HookContinue, nil
 }

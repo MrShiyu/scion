@@ -29,13 +29,13 @@ var defaultKEY = []byte{0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}
 // Conf is the main digest structure.
 type DigestStore struct {
 	Curr_seq_num   uint32	//the current seq num for this AS
-	Seq_num_window uint32               //FIXME: need to reconcile with the BF coverage period
+	Seq_num_window uint32
 	Seq_info       map[string]*Curr_seq //map from the name of the border router to its current sequence number
 	filter         []BlockedFilter
 	length         int
 }
 
-const Seq_num_range = 1000000
+const Seq_num_range = 100000000
 
 //information needed for sequence number update
 type Curr_seq struct{
@@ -59,7 +59,7 @@ func Load(numHashes, size, number int) {
 		filter[i] = NewBlockedBloomFilter(numHashes, size)
 	}
 	digest.filter = filter
-	digest.Seq_num_window = 11 //FIXME: number needs discussing
+	digest.Seq_num_window = 11
 	info := make(map[string]*Curr_seq)
 	digest.Seq_info = info
 	// Save Digest
@@ -76,15 +76,11 @@ func (D *DigestStore)AddAsEntry(asname string, seqNum uint32){
 		Valid: false,
 		MacKey: defaultKEY}
 	D.Seq_info[asname] = &new_seq
-	//log.Debug("create a new entry for " + asname)
-	//ss := fmt.Sprintf("the As %s has sequence number %d initial TTL %d", asname,new_seq.Seq_num, int64(new_seq.TTL))
-	//log.Debug(ss)
 }
 
 func Add(byte_str []byte){
 	D.filter[Writeable].BlockAdd(byte_str)
-	//s := fmt.Sprintf("digest successfully added to filter %d", Writeable)
-	//log.Debug(s)
+
 }
 
 //Check if data is in the whole block filter
@@ -107,8 +103,7 @@ func Rotate() {
 		Writeable = 0
 	}
 	D.filter[Writeable].Reset()
-	//s := fmt.Sprintf("%dth filter is now writeable and reset to 0", Writeable)
-	//log.Debug(s)
+
 }
 
 
@@ -123,6 +118,5 @@ const SeqIncplusDelta = SeqIncFreq + delta
 func TTLupdate(as string, augment time.Duration){
 	//augment is a negative TTL that remains from the last session
 	D.Seq_info[as].TTL = SeqIncplusDelta + TTLcheckFreq + augment
-	//s:=fmt.Sprintf("the TTL of the sequence number for %s is reinitialized to %d", as, D.Seq_info[as].TTL)
-	//log.Debug(s)
+
 }
